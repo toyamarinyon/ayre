@@ -1,0 +1,17 @@
+.build/
+build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+.DS_Store
+
+# Local diagnostics and signing material
+*.log
+*.xcresult/
+.env
+.env.*
+!.env.example
+*.p12
+*.p8
+*.mobileprovision
+*.provisionprofile
