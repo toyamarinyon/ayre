@@ -54,6 +54,13 @@ final class AppLifecycleStateTests: XCTestCase {
         XCTAssertTrue(state.hasPresented)
     }
 
+    func testForegroundReopenIsDistinctFromBackgroundAutomation() {
+        XCTAssertTrue(ReopenWindowPolicy.shouldPresentSettings(isReopenApplicationEvent: true, activationExpected: true))
+        XCTAssertFalse(ReopenWindowPolicy.shouldPresentSettings(isReopenApplicationEvent: true, activationExpected: false))
+        XCTAssertFalse(ReopenWindowPolicy.shouldPresentSettings(isReopenApplicationEvent: true, activationExpected: nil))
+        XCTAssertFalse(ReopenWindowPolicy.shouldPresentSettings(isReopenApplicationEvent: false, activationExpected: true))
+    }
+
     func testLoginItemStateAndErrorsRemainTruthful() {
         XCTAssertFalse(LoginItemSnapshot(status: .notRegistered).isToggleOn)
         XCTAssertTrue(LoginItemSnapshot(status: .enabled).isToggleOn)

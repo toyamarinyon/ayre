@@ -13,6 +13,14 @@ enum AppLifecycle {
         return value.boolValue
     }
 
+    /// Launch Services marks foreground reopen requests with the public 'aapd' Boolean.
+    /// Background App Intent opens must not be turned into foreground settings requests.
+    static func activationExpected(in event: NSAppleEventDescriptor?) -> Bool? {
+        let value = event?.paramDescriptor(forKeyword: kAEApplicationActivationExpected)
+            ?? event?.attributeDescriptor(forKeyword: kAEApplicationActivationExpected)
+        return value?.booleanValue
+    }
+
     static func initialOpenApplicationKind(from event: NSAppleEventDescriptor?) -> InitialOpenApplicationKind {
         guard let event,
               event.eventClass == AEEventClass(kCoreEventClass),

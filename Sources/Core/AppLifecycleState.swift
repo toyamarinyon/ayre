@@ -93,3 +93,11 @@ public struct LoginItemSnapshot: Equatable, Sendable {
         return "\(currentStatus). Could not update the setting: \(operationError)"
     }
 }
+
+/// A reopen event also occurs for background automation. Only an explicit foreground
+/// activation request authorizes presenting Settings; explicit menu actions bypass this policy.
+public enum ReopenWindowPolicy {
+    public static func shouldPresentSettings(isReopenApplicationEvent: Bool, activationExpected: Bool?) -> Bool {
+        isReopenApplicationEvent && activationExpected == true
+    }
+}

@@ -83,6 +83,7 @@ swift run ayre prompts
 swift run ayre export-samples
 swift run ayre inspect --delay 5
 swift run ayre insert --sample short --delay 5 --method auto
+bash scripts/verify-lifecycle.sh
 bash plugins/ayre/tests/test-helper.sh
 python3 scripts/verify-package.py
 claude plugin validate .

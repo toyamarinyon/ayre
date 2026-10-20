@@ -4,7 +4,7 @@ Verified on October 21, 2026, on Apple silicon running macOS 26.6.2 with Xcode 2
 
 ## Automated and package checks
 
-- `swift test` and `swift test -c release`: 27 tests passed. Coverage includes unchanged insertion classification/strict comparison, exact-byte storage, atomic conflict handling including symlinks, invalid/oversized input, explicit replacement, CLI I/O errors, and launch-event ordering/background decisions.
+- `swift test` and `swift test -c release`: 28 tests passed. Coverage includes unchanged insertion classification/strict comparison, exact-byte storage, atomic conflict handling including symlinks, invalid/oversized input, explicit replacement, CLI I/O errors, and launch-event ordering/background decisions.
 - `scripts/build.sh --unsigned --universal --derived-data build/UnsignedFinal`: passed. Both GUI and CLI contain arm64 and x86_64. Mach-O minimum OS for the bundled CLI is 14.0.
 - `scripts/build.sh --team <local-team> --universal`: passed using an existing Apple Development certificate, with manual Keychain authorization. Both nested CLI and enclosing app passed `codesign --verify --deep --strict`. This is a development build, not a public distribution signature.
 - `scripts/verify-package.py <app>`: passed for unsigned and signed packages. GUI `AyreApp` and CLI `ayre` are separate files even on a case-insensitive filesystem. App identity/version/background metadata and generated App Intents metadata are checked. Ayre Go has no parameters; both actions have `openAppWhenRun = false`.
@@ -27,3 +27,9 @@ Verified on October 21, 2026, on Apple silicon running macOS 26.6.2 with Xcode 2
 The insertion engine, focus/target validation, picker and intent implementation were not changed. Earlier hardware results remain in `results.md`; they are not new 0.2.0 end-to-end evidence. Codex insertion, middle/selection cases through Spotlight, cancellation/error coverage, and an actual login cycle still need user-driven confirmation. The computer-use tool refused System Settings access and timed out when binding Spotlight; no alternative UI automation bypass was used.
 
 Public distribution remains pending Developer ID Application credentials and a notarytool Keychain profile. Once supplied, run the documented release script and review the resulting artifact before publishing a GitHub Release. No release was published in this implementation session.
+
+## Follow-up: Spotlight reopen regression
+
+User-driven Ayre Go tests exposed a focus regression in the initial onboarding implementation: the app became frontmost before `perform()`, so the unchanged target resolver correctly rejected Ayre itself and wrote nothing. The unconditional Settings presentation in the reopen delegate is being replaced with a check for the public `kAEApplicationActivationExpected` Boolean on the reopen event. Only an explicit foreground request may show Settings. Missing/false flags remain in the background; insertion target validation is unchanged.
+
+Debug and Release suites pass 28 tests with this candidate fix. `bash scripts/verify-lifecycle.sh` additionally exercises the actual Foundation Apple Event parameter/attribute bridge and login/service markers without launching UI or registering login items. The updated signed package and actual Spotlight foreground/background event distinction still require live verification; the development signing process is awaiting manual Keychain authorization. Earlier signed ZIP evidence above predates this follow-up and does not prove the regression fixed.

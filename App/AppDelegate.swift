@@ -77,8 +77,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
-        showWindow()
-        return true
+        let event = NSAppleEventManager.shared().currentAppleEvent
+        let expected = AppLifecycle.activationExpected(in: event)
+        let shouldShow = ReopenWindowPolicy.shouldPresentSettings(
+            isReopenApplicationEvent: event?.eventClass == AEEventClass(kCoreEventClass)
+                && event?.eventID == AEEventID(kAEReopenApplication),
+            activationExpected: expected
+        )
+        let senderPID = event?.attributeDescriptor(forKeyword: keySenderPIDAttr)?.int32Value
+        let senderBundle = senderPID.flatMap { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier } ?? "unknown"
+        ProbeLog.log("Reopen event=\(event?.eventID ?? 0) activationExpected=\(expected.map(String.init) ?? "missing") active=\(sender.isActive) sender=\(senderBundle) showSettings=\(shouldShow)")
+        if shouldShow { showWindow() }
+        return false
     }
 
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
