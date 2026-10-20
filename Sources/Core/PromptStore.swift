@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 /// A saved prompt: `<slug>.md` in the store directory. The file's bytes are inserted unchanged.
 public struct StoredPrompt: Equatable {
@@ -15,6 +16,7 @@ public enum PromptStoreError: Error, CustomStringConvertible {
     case tooLarge(String, Int)
     case notUTF8(String)
     case alreadyExists(String)
+    case writeFailed(String, String)
 
     public var description: String {
         switch self {
@@ -23,6 +25,7 @@ public enum PromptStoreError: Error, CustomStringConvertible {
         case .tooLarge(let s, let n): return "Prompt exceeds the size limit: \(s) (\(n) bytes > \(PromptStore.maxBytes))"
         case .notUTF8(let s): return "Cannot decode UTF-8: \(s)"
         case .alreadyExists(let s): return "Already exists: \(s)"
+        case .writeFailed(let s, let reason): return "Could not save prompt \(s): \(reason)"
         }
     }
 }
@@ -51,10 +54,12 @@ public struct PromptStore {
 
     /// Title = first ATX level-1 heading in the first lines, otherwise the slug.
     public static func title(of text: String, slug: String) -> String {
-        for line in text.split(separator: "\n", omittingEmptySubsequences: false).prefix(20) {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
+        let lines = text.unicodeScalars.split(separator: "\n", omittingEmptySubsequences: false).prefix(20)
+        for scalarLine in lines {
+            let line = String(String.UnicodeScalarView(scalarLine))
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.hasPrefix("# ") {
-                let title = trimmed.dropFirst(2).trimmingCharacters(in: .whitespaces)
+                let title = trimmed.dropFirst(2).trimmingCharacters(in: .whitespacesAndNewlines)
                 if !title.isEmpty { return title }
             }
         }
@@ -106,12 +111,55 @@ public struct PromptStore {
     }
 
     public func save(_ text: String, slug: String, overwrite: Bool = false) throws {
+        try save(Data(text.utf8), slug: slug, overwrite: overwrite)
+    }
+
+    /// Saves valid UTF-8 bytes unchanged using a same-directory temporary file and atomic publication.
+    public func save(_ data: Data, slug: String, overwrite: Bool = false) throws {
         let url = try url(for: slug)
-        let data = Data(text.utf8)
         guard data.count <= Self.maxBytes else { throw PromptStoreError.tooLarge(slug, data.count) }
-        if !overwrite, FileManager.default.fileExists(atPath: url.path) { throw PromptStoreError.alreadyExists(slug) }
+        guard String(data: data, encoding: .utf8) != nil else { throw PromptStoreError.notUTF8(slug) }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        try data.write(to: url, options: .atomic)
+        let fm = FileManager.default
+        var temporaryURL: URL?
+        var fd: Int32 = -1
+        for _ in 0..<10 {
+            let candidate = directory.appendingPathComponent(".\(slug).\(UUID().uuidString).tmp")
+            fd = open(candidate.path, O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR)
+            if fd >= 0 { temporaryURL = candidate; break }
+            if errno != EEXIST { throw PromptStoreError.writeFailed(slug, String(cString: strerror(errno))) }
+        }
+        guard let temporaryURL else { throw PromptStoreError.writeFailed(slug, "could not create a temporary file") }
+        defer { if fd >= 0 { _ = close(fd) }; try? fm.removeItem(at: temporaryURL) }
+
+        try data.withUnsafeBytes { rawBuffer in
+            guard let base = rawBuffer.baseAddress else { return }
+            var offset = 0
+            while offset < rawBuffer.count {
+                let count = write(fd, base.advanced(by: offset), rawBuffer.count - offset)
+                if count < 0 {
+                    if errno == EINTR { continue }
+                    throw PromptStoreError.writeFailed(slug, String(cString: strerror(errno)))
+                }
+                if count == 0 { throw PromptStoreError.writeFailed(slug, "write returned no data") }
+                offset += count
+            }
+        }
+        guard fsync(fd) == 0 else { throw PromptStoreError.writeFailed(slug, String(cString: strerror(errno))) }
+        guard close(fd) == 0 else { fd = -1; throw PromptStoreError.writeFailed(slug, String(cString: strerror(errno))) }
+        fd = -1
+
+        if overwrite {
+            guard rename(temporaryURL.path, url.path) == 0 else {
+                throw PromptStoreError.writeFailed(slug, String(cString: strerror(errno)))
+            }
+        } else {
+            // link() publishes atomically and fails if any destination entry, including a symlink, exists.
+            guard link(temporaryURL.path, url.path) == 0 else {
+                if errno == EEXIST { throw PromptStoreError.alreadyExists(slug) }
+                throw PromptStoreError.writeFailed(slug, String(cString: strerror(errno)))
+            }
+        }
     }
 
     private func load(_ slug: String) throws -> (text: String, prompt: StoredPrompt) {
@@ -119,7 +167,7 @@ public struct PromptStore {
         guard let data = FileManager.default.contents(atPath: url.path) else { throw PromptStoreError.notFound(slug) }
         guard data.count <= Self.maxBytes else { throw PromptStoreError.tooLarge(slug, data.count) }
         guard let text = String(data: data, encoding: .utf8) else { throw PromptStoreError.notUTF8(slug) }
-        let lines = text.isEmpty ? 0 : text.split(separator: "\n", omittingEmptySubsequences: false).count
+        let lines = text.isEmpty ? 0 : text.unicodeScalars.split(separator: "\n", omittingEmptySubsequences: false).count
         return (text, StoredPrompt(slug: slug, title: Self.title(of: text, slug: slug), modified: .distantPast,
                                    utf8Count: data.count, lineCount: lines))
     }

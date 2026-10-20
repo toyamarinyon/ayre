@@ -1,16 +1,16 @@
+import ProbeCore
 import AppKit
 import ApplicationServices
-import ProbeCore
 
 let usage = """
 usage:
-  PromptInsertProbeCLI env
-  PromptInsertProbeCLI samples
-  PromptInsertProbeCLI prompts
-  PromptInsertProbeCLI export-samples [--force]
-  PromptInsertProbeCLI request-permission
-  PromptInsertProbeCLI inspect [--delay 5] [--no-electron-ax]
-  PromptInsertProbeCLI insert --sample short|markdown|long [--method auto|selected-text|value|codex-value] [--delay 5] [--no-electron-ax]
+  ayre --version
+  ayre --help
+  ayre capabilities --json
+  ayre put <slug> --title <title> [--overwrite] [--store <directory>]
+  ayre env | samples | prompts | export-samples [--force] | request-permission
+  ayre inspect [--delay 5] [--no-electron-ax]
+  ayre insert --sample short|markdown|long [--method auto|selected-text|value|codex-value] [--delay 5] [--no-electron-ax]
 
 prompts: List saved prompts available in the app picker.
 export-samples: Save sample-short / sample-markdown / sample-long for acceptance testing.
@@ -32,6 +32,16 @@ func flag(_ name: String) -> Bool { args.contains(name) }
 func fail(_ message: String, code: Int32 = 1) -> Never {
     ProbeLog.log("FAILED: \(message)")
     exit(code)
+}
+
+func readStandardInput(maxBytes: Int) throws -> Data {
+    var data = Data()
+    while data.count <= maxBytes {
+        let chunk = try FileHandle.standardInput.read(upToCount: min(64 * 1024, maxBytes + 1 - data.count)) ?? Data()
+        if chunk.isEmpty { break }
+        data.append(chunk)
+    }
+    return data
 }
 
 func waitForUser(seconds: Double) -> pid_t? {
@@ -63,6 +73,76 @@ func captureAfterDelay() -> FocusTarget {
 }
 
 guard let command = args.first else { print(usage); exit(2) }
+
+func jsonString(_ value: String) -> String {
+    let data = try! JSONSerialization.data(withJSONObject: [value], options: [.fragmentsAllowed])
+    let encoded = String(decoding: data, as: UTF8.self)
+    return String(encoded.dropFirst().dropLast())
+}
+
+if command == "--version" {
+    print(CLIContract.version)
+    exit(0)
+}
+if command == "--help" || command == "-h" {
+    print(usage)
+    exit(0)
+}
+if command == "capabilities" {
+    guard args.count == 2, args[1] == "--json" else { print(usage); exit(2) }
+    print("{\"protocolVersion\":\(CLIContract.protocolVersion),\"version\":\(jsonString(CLIContract.version)),\"capabilities\":[\(CLIContract.capabilities.map(jsonString).joined(separator: ","))]}")
+    exit(0)
+}
+if command == "put" {
+    guard args.count >= 4, let slug = args.dropFirst().first else {
+        FileHandle.standardError.write(Data("usage: ayre put <slug> --title <title> [--overwrite] [--store <directory>]\n".utf8)); exit(2)
+    }
+    var title: String?
+    var overwrite = false
+    var storeDirectory: URL?
+    var i = 2
+    while i < args.count {
+        switch args[i] {
+        case "--title":
+            guard title == nil, i + 1 < args.count else { FileHandle.standardError.write(Data("--title must appear once and needs a value\n".utf8)); exit(2) }
+            title = args[i + 1]
+            i += 2
+        case "--overwrite":
+            guard !overwrite else { FileHandle.standardError.write(Data("--overwrite may appear only once\n".utf8)); exit(2) }
+            overwrite = true; i += 1
+        case "--store":
+            guard storeDirectory == nil, i + 1 < args.count else { FileHandle.standardError.write(Data("--store must appear once and needs a directory\n".utf8)); exit(2) }
+            storeDirectory = URL(fileURLWithPath: args[i + 1], isDirectory: true)
+            i += 2
+        default:
+            FileHandle.standardError.write(Data("Unknown put argument: \(args[i])\n".utf8)); exit(2)
+        }
+    }
+    guard let title else { FileHandle.standardError.write(Data("--title is required\n".utf8)); exit(2) }
+    guard PromptStore.isValidSlug(slug) else { FileHandle.standardError.write(Data("Invalid slug: \(slug)\n".utf8)); exit(2) }
+    let bytes: Data
+    do { bytes = try readStandardInput(maxBytes: PromptStore.maxBytes) }
+    catch { FileHandle.standardError.write(Data("Could not read stdin: \(error)\n".utf8)); exit(4) }
+    guard bytes.count <= PromptStore.maxBytes else { FileHandle.standardError.write(Data("Prompt exceeds the size limit (maximum \(PromptStore.maxBytes) bytes)\n".utf8)); exit(2) }
+    guard let text = String(data: bytes, encoding: .utf8) else { FileHandle.standardError.write(Data("stdin must contain valid UTF-8\n".utf8)); exit(2) }
+    let derivedTitle = PromptStore.title(of: text, slug: slug)
+    guard title == derivedTitle else {
+        FileHandle.standardError.write(Data("Title mismatch: --title must be \(jsonString(derivedTitle)), derived from the first '# ' heading in the first 20 lines or the slug. The text was not changed.\n".utf8)); exit(2)
+    }
+    do {
+        try PromptStore(directory: storeDirectory ?? PromptStore.defaultDirectory).save(bytes, slug: slug, overwrite: overwrite)
+        print("saved\t\(slug)\t\(bytes.count) bytes\t\(title)")
+        exit(0)
+    } catch {
+        FileHandle.standardError.write(Data("\(error)\n".utf8))
+        if case PromptStoreError.alreadyExists = error { exit(3) }
+        if case PromptStoreError.invalidSlug = error { exit(2) }
+        if case PromptStoreError.notUTF8 = error { exit(2) }
+        if case PromptStoreError.tooLarge = error { exit(2) }
+        exit(4)
+    }
+}
+
 ProbeLog.section("CLI \(args.joined(separator: " "))")
 ProbeEnvironment.log()
 

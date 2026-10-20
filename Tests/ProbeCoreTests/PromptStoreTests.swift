@@ -52,6 +52,20 @@ final class PromptStoreTests: XCTestCase {
         XCTAssertThrowsError(try store.save(String(repeating: "a", count: PromptStore.maxBytes + 1), slug: "huge2"))
     }
 
+    func testByteSavePreservesUTF8AndRejectsNoClobberSymlink() throws {
+        let bytes = Data("# Cafe\u{301}\r\nbody\n".utf8)
+        try store.save(bytes, slug: "bytes")
+        XCTAssertEqual(try Data(contentsOf: store.url(for: "bytes")), bytes)
+        XCTAssertEqual(PromptStore.title(of: String(decoding: bytes, as: UTF8.self), slug: "bytes"), "Cafe\u{301}")
+
+        try FileManager.default.createSymbolicLink(at: store.url(for: "linked"), withDestinationURL: store.url(for: "bytes"))
+        XCTAssertThrowsError(try store.save(Data("replacement".utf8), slug: "linked"))
+        XCTAssertEqual(try Data(contentsOf: store.url(for: "bytes")), bytes)
+
+        try store.save(Data("replacement".utf8), slug: "linked", overwrite: true)
+        XCTAssertFalse(try store.url(for: "linked").resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink ?? true)
+    }
+
     func testFilterRequiresAllTerms() {
         let p = { (slug: String, title: String) in StoredPrompt(slug: slug, title: title, modified: .distantPast, utf8Count: 0, lineCount: 0) }
         let prompts = [p("auth-plan", "認証の設計"), p("ui", "画面の設計"), p("misc", "メモ")]
