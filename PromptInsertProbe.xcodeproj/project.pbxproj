@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		A1B2C3D4E5F6000000000001 /* PromptInsertProbe.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PromptInsertProbe.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1B2C3D4E5F6000000000001 /* PromptInsertProbe.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ayre.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -173,9 +173,10 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = NO;
-				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Ayre;
+				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
@@ -183,9 +184,10 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.local.PromptInsertProbe;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				MARKETING_VERSION = 0.2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.toyamarinyon.ayre;
+				PRODUCT_NAME = Ayre;
+				EXECUTABLE_NAME = AyreApp;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 			};
 			name = Debug;
@@ -198,9 +200,10 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = NO;
-				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Ayre;
+				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
@@ -208,9 +211,10 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.local.PromptInsertProbe;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				MARKETING_VERSION = 0.2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.toyamarinyon.ayre;
+				PRODUCT_NAME = Ayre;
+				EXECUTABLE_NAME = AyreApp;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 			};
 			name = Release;
