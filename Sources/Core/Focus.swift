@@ -12,12 +12,12 @@ public enum ProbeError: Error, CustomStringConvertible {
     public var description: String {
         switch self {
         case .notTrusted:
-            return "Accessibility権限がありません（システム設定 > プライバシーとセキュリティ > アクセシビリティ で許可）"
-        case .noFocusedApplication(let e): return "フォーカス中のアプリを取得できません: AXError=\(axErrorName(e))"
-        case .noFocusedElement(let e): return "フォーカス中のUI要素を取得できません: AXError=\(axErrorName(e))"
-        case .notEditable(let r): return "編集可能な入力欄ではありません: \(r)"
-        case .targetChanged(let r): return "挿入対象が無効または変化しました: \(r)"
-        case .writeFailed(let e): return "書き込みに失敗: AXError=\(axErrorName(e))"
+            return "Accessibility permission is required (System Settings > Privacy & Security > Accessibility)."
+        case .noFocusedApplication(let e): return "Cannot get the focused application: AXError=\(axErrorName(e))"
+        case .noFocusedElement(let e): return "Cannot get the focused UI element: AXError=\(axErrorName(e))"
+        case .notEditable(let r): return "Not an editable text field: \(r)"
+        case .targetChanged(let r): return "Insertion target is invalid or has changed: \(r)"
+        case .writeFailed(let e): return "Write failed: AXError=\(axErrorName(e))"
         }
     }
 }
@@ -153,14 +153,14 @@ public enum Focus {
         let el = target.element
         let (roleErr, roleValue) = AX.copy(el, kAXRoleAttribute)
         guard roleErr == .success, roleValue != nil else {
-            return .failure(.targetChanged("role取得失敗 AXError=\(axErrorName(roleErr))"))
+            return .failure(.targetChanged("Cannot read role: AXError=\(axErrorName(roleErr))"))
         }
         let role = AX.string(el, kAXRoleAttribute) ?? "?"
         if AX.string(el, kAXSubroleAttribute) == (kAXSecureTextFieldSubrole as String) {
             return .failure(.notEditable("secure text field"))
         }
         guard textRoles.contains(role) else {
-            return .failure(.notEditable("role=\(role) はテキスト入力のroleではない"))
+            return .failure(.notEditable("role=\(role) is not a text input role"))
         }
         let (err, settable) = AX.isSettable(el, kAXSelectedTextAttribute)
         guard err == .success, settable else {
@@ -172,16 +172,16 @@ public enum Focus {
     /// The target is still valid only if it still exists and is still the focused element of the focused app.
     public static func validateStillFocused(_ target: FocusTarget) -> Result<Void, ProbeError> {
         switch systemWideFocusedApplicationPID() {
-        case .failure(let e): return .failure(.targetChanged("フォーカス中アプリ取得失敗: \(e)"))
+        case .failure(let e): return .failure(.targetChanged("Cannot get the focused app: \(e)"))
         case .success(let pid) where pid != target.pid:
             let info = appInfo(pid: pid)
-            return .failure(.targetChanged("フォーカス中アプリが変化: pid=\(pid) bundleID=\(info.bundleID ?? "?")"))
+            return .failure(.targetChanged("Focused app changed: pid=\(pid) bundleID=\(info.bundleID ?? "?")"))
         default: break
         }
         let (err, current) = appFocusedElement(pid: target.pid)
-        guard let current else { return .failure(.targetChanged("フォーカス要素取得失敗 AXError=\(axErrorName(err))")) }
+        guard let current else { return .failure(.targetChanged("Cannot get the focused element: AXError=\(axErrorName(err))")) }
         guard CFEqual(current, target.element) else {
-            return .failure(.targetChanged("フォーカス要素が別の要素に変化 (role=\(AX.string(current, kAXRoleAttribute) ?? "?"))"))
+            return .failure(.targetChanged("Focused element changed (role=\(AX.string(current, kAXRoleAttribute) ?? "?"))"))
         }
         return checkEditable(target)
     }

@@ -57,7 +57,7 @@ public enum EmptyFieldDiagnostic {
 
     public static func capture(_ target: FocusTarget) -> [String: String]? {
         guard case .success = Focus.validateStillFocused(target) else {
-            ProbeLog.log("[empty comparison] ABORT: 対象のフォーカスを確認できない")
+            ProbeLog.log("[empty comparison] ABORT: Cannot verify target focus")
             return nil
         }
         let el = target.element
@@ -155,12 +155,12 @@ public enum EmptyFieldDiagnostic {
               let before, let after = AX.string(el, kAXValueAttribute), StrictCompare.equal(before, after),
               let selection, let afterSelection = AX.range(el, kAXSelectedTextRangeAttribute),
               selection.location == afterSelection.location, selection.length == afterSelection.length else {
-            ProbeLog.log("[empty comparison] ABORT: 診断中に本文・選択範囲・フォーカスが変化、または読み取り不能")
+            ProbeLog.log("[empty comparison] ABORT: Text, selection, or focus changed or became unreadable during diagnostics")
             return nil
         }
         for key in result.keys.sorted() { ProbeLog.log("[empty comparison] \(key): \(result[key]!)") }
         save(result, target: target)
-        ProbeLog.log("[empty comparison] read-only snapshot complete（本文・選択範囲不変）")
+        ProbeLog.log("[empty comparison] read-only snapshot complete (text and selection unchanged)")
         return result
     }
 

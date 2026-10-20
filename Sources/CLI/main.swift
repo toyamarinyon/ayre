@@ -12,14 +12,14 @@ usage:
   PromptInsertProbeCLI inspect [--delay 5] [--no-electron-ax]
   PromptInsertProbeCLI insert --sample short|markdown|long [--method auto|selected-text|value|codex-value] [--delay 5] [--no-electron-ax]
 
-prompts: 保存済みプロンプト（アプリの選択UIに出るもの）の一覧。
-export-samples: サンプル3種を sample-short / sample-markdown / sample-long として保存先へ書き出す（受け入れ検証用）。
+prompts: List saved prompts available in the app picker.
+export-samples: Save sample-short / sample-markdown / sample-long for acceptance testing.
 
---method auto（既定）: Codex (com.openai.codex) は codex-value、それ以外は selected-text。
+--method auto (default): codex-value for Codex (com.openai.codex), selected-text otherwise.
 
-inspect/insert は --delay 秒待ってから、その時点でフォーカスされている要素を対象にします。
-待機中に対象アプリの入力欄へフォーカスしてください（Cmd+Tab ならカーソル位置・選択範囲が保たれます）。
-開始時と同じアプリ（=起動したターミナル）にフォーカスが残っている場合は何もしません。
+inspect/insert wait --delay seconds, then capture the focused element.
+Focus the target field during the delay. Cmd+Tab preserves the cursor and selection.
+Nothing is written if focus remains on the launching application (the terminal).
 """
 
 var args = Array(CommandLine.arguments.dropFirst())
@@ -41,7 +41,7 @@ func waitForUser(seconds: Double) -> pid_t? {
     }
     var remaining = Int(seconds.rounded(.up))
     while remaining > 0 {
-        FileHandle.standardError.write(Data("  \(remaining)秒後に対象を取得します…\n".utf8))
+        FileHandle.standardError.write(Data("  \(remaining) seconds until target capture...\n".utf8))
         RunLoop.current.run(until: Date().addingTimeInterval(min(1, Double(remaining))))
         remaining -= 1
     }
@@ -55,7 +55,7 @@ func captureAfterDelay() -> FocusTarget {
     case .failure(let e): fail(e.description)
     case .success(let t):
         if let startPID, t.pid == startPID {
-            fail("フォーカスが起動元アプリ(pid=\(startPID))から移っていません。対象の入力欄へフォーカスしてください")
+            fail("Focus has not left the launching application (pid=\(startPID)). Focus the target text field.")
         }
         Focus.logReport(t)
         return t
@@ -90,7 +90,7 @@ case "export-samples":
     print("dir\t\(store.directory.path)")
 case "request-permission":
     let trusted = AX.isTrusted(prompt: true)
-    print(trusted ? "trusted" : "未許可：表示されたダイアログ、または システム設定 > プライバシーとセキュリティ > アクセシビリティ でターミナルアプリを許可してください")
+    print(trusted ? "trusted" : "Not granted: allow your terminal in the permission dialog or System Settings > Privacy & Security > Accessibility.")
 case "inspect":
     let t = captureAfterDelay()
     switch Focus.checkEditable(t) {

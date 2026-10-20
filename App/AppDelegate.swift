@@ -15,7 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var window: NSWindow!
     let statusLabel = NSTextField(wrappingLabelWithString: "")
     let storeLabel = NSTextField(wrappingLabelWithString: "")
-    let hotKeyCheckbox = NSButton(checkboxWithTitle: "グローバルホットキー ⌃⌥⌘P で選択パネルを表示（このアプリ起動中のみ）", target: nil, action: nil)
+    let hotKeyCheckbox = NSButton(checkboxWithTitle: "Open the picker with ⌃⌥⌘P while Ayre is running", target: nil, action: nil)
     let hotKey = HotKey()
     let picker = PickerController()
 
@@ -35,24 +35,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func buildWindow() {
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 360),
                           styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
-        window.title = "PromptInsertProbe"
+        window.title = "Ayre"
         window.isReleasedWhenClosed = false
         hotKeyCheckbox.target = self
         hotKeyCheckbox.action = #selector(toggleHotKey)
 
         let permissionButtons = NSStackView(views: [
-            NSButton(title: "権限を再確認", target: self, action: #selector(refreshStatus)),
-            NSButton(title: "権限を要求", target: self, action: #selector(requestPermission)),
-            NSButton(title: "システム設定を開く", target: self, action: #selector(openSettings)),
-            NSButton(title: "ログを開く", target: self, action: #selector(openLog)),
+            NSButton(title: "Check Permission", target: self, action: #selector(refreshStatus)),
+            NSButton(title: "Request Permission", target: self, action: #selector(requestPermission)),
+            NSButton(title: "Open System Settings", target: self, action: #selector(openSettings)),
+            NSButton(title: "Open Log", target: self, action: #selector(openLog)),
         ])
         let storeButtons = NSStackView(views: [
-            NSButton(title: "保存先を開く", target: self, action: #selector(openStore)),
-            NSButton(title: "一覧を再読み込み", target: self, action: #selector(refreshStatus)),
+            NSButton(title: "Open Prompt Folder", target: self, action: #selector(openStore)),
+            NSButton(title: "Reload Prompts", target: self, action: #selector(refreshStatus)),
         ])
         let help = NSTextField(wrappingLabelWithString: """
-        使い方：入力欄にカーソルを置き、⌃⌥⌘P で選択パネルを開く（検索 → ↑↓ → Return、Escで中止）。またはSpotlightで「Promptを入力」を実行。
-        挿入は元の入力欄にフォーカスが戻った場合だけ行い、送信はしません。対象や入力欄の状態を判別できない場合は書き込みません。
+        Place the cursor in a text field. Use Spotlight: Ayre Go inserts the latest prompt; Ayre Pick lets you choose. Or press ⌃⌥⌘P, search, select with ↑↓, and press Return. Esc cancels.
+        Insertion requires focus to return to the original field. Ayre never sends your message. If the target or field state cannot be verified, nothing is written.
         """)
         let separator = NSBox()
         separator.boxType = .separator
@@ -73,8 +73,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let appItem = NSMenuItem()
         menu.addItem(appItem)
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "ウィンドウを表示", action: #selector(showWindow), keyEquivalent: "0")
-        appMenu.addItem(withTitle: "PromptInsertProbe を終了", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: "Show Window", action: #selector(showWindow), keyEquivalent: "0")
+        appMenu.addItem(withTitle: "Quit Ayre", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         NSApp.mainMenu = menu
     }
@@ -84,10 +84,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func refreshStatus() {
         let trusted = AXIsProcessTrusted()
         statusLabel.stringValue = trusted
-            ? "Accessibility権限: 許可済み（\(Bundle.main.bundlePath)）"
-            : "Accessibility権限: 未許可。「権限を要求」またはシステム設定 > プライバシーとセキュリティ > アクセシビリティ で PromptInsertProbe を許可してください。再ビルドで署名が変わると許可が無効になることがあります。"
+            ? "Accessibility permission: granted (\(Bundle.main.bundlePath))"
+            : "Accessibility permission: not granted. Click Request Permission or allow Ayre in System Settings > Privacy & Security > Accessibility. Changing the code signature may invalidate permission."
         let (prompts, skipped) = picker.store.list()
-        storeLabel.stringValue = "保存済みプロンプト: \(prompts.count)件\(skipped > 0 ? "（読めないファイル \(skipped)件を除外）" : "")\n保存先: \(picker.store.directory.path)（<slug>.md、UTF-8、\(PromptStore.maxBytes / 1000)KBまで）"
+        storeLabel.stringValue = "Saved prompts: \(prompts.count) files\(skipped > 0 ? " (skipped unreadable files: \(skipped) files)" : "")\nFolder: \(picker.store.directory.path) (<slug>.md, UTF-8, up to \(PromptStore.maxBytes / 1000) KB)"
         ProbeLog.log("AXIsProcessTrusted=\(trusted) prompts=\(prompts.count) skipped=\(skipped)")
     }
 

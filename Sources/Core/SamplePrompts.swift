@@ -15,13 +15,13 @@ public enum SamplePrompts {
 
     public static let short = SamplePrompt(
         id: "short",
-        title: "短文テスト",
+        title: "Short test",
         text: "PromptInsertProbe 短文テスト：こんにちは。"
     )
 
     public static let markdown = SamplePrompt(
         id: "markdown",
-        title: "Markdownテスト",
+        title: "Markdown test",
         text: """
         # PromptInsertProbe Markdownテスト
 
@@ -74,6 +74,6 @@ public enum SamplePrompts {
         }
         lines.append("")
         lines.append("END-OF-LONG-TEST lines=\(total)")
-        return SamplePrompt(id: "long", title: "長文テスト", text: lines.joined(separator: "\n"))
+        return SamplePrompt(id: "long", title: "Long test", text: lines.joined(separator: "\n"))
     }()
 }

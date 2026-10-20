@@ -1,38 +1,63 @@
 # Ayre
 
-保存したMarkdownプロンプトを、フォーカス中の入力欄へ直接挿入するmacOSアプリです。クリップボードや合成キー入力を使わず、送信もしません。
+Insert saved Markdown prompts into the focused text field on macOS, directly from Spotlight. Ayre uses Accessibility APIs, does not use the clipboard or synthetic keystrokes, and never sends your message.
 
-## 現在の状態
+## Commands
 
-PromptInsertProbeでの実機検証を引き継いだ開発用リポジトリです。初期コミットでは動作を保つため、Xcodeターゲット・Bundle ID・保存先・Spotlightの表示名は検証版の名称を維持しています。
+- **Ayre Go**: insert the most recently modified readable prompt without choosing one. Modification-time ties are resolved by slug.
+- **Ayre Pick**: choose a saved prompt, then insert it.
+- **Control + Option + Command + P**: open the searchable picker; use arrow keys and Return to select, or Esc to cancel.
 
-- Spotlight「Promptを入力」: 保存済みプロンプトを選択して入力
-- Spotlight「最新のPromptを入力」: 更新日時が最新の1件を選択なしで入力
-- グローバルホットキー: Control + Option + Command + P
-- 保存先: `~/Library/Application Support/PromptInsertProbe/Prompts/<slug>.md`
+Place the cursor in the destination field before invoking a command. Insertion proceeds only after focus returns to that same field. Unknown targets or field states abort without writing.
 
-正式名称は **Ayre**。次の変更でコマンドを **Ayre Go** / **Ayre Pick** に揃え、既存プロンプトを保ったまま移行します。
+## Prompt files
 
-## 開発
+The existing storage location is retained for compatibility:
 
-macOS 14以降とXcodeが必要です。
+```text
+~/Library/Application Support/PromptInsertProbe/Prompts/<slug>.md
+```
+
+Files must be UTF-8 and no larger than 1,000,000 bytes. Slugs use ASCII letters, digits, dots, underscores, and hyphens, start with a letter or digit, and cannot contain consecutive dots. The first `# ` heading within the first 20 lines supplies the title; otherwise, the slug is displayed. The entire file, including its heading, is inserted unchanged.
+
+Edit these files with any text editor. Ayre reads the selected file again at insertion time. Existing user prompts are never translated. Japanese and other Unicode text in test fixtures is intentional.
+
+## Build and test
+
+Requires macOS 14 or later and Xcode.
 
 ```sh
 swift test
 bash scripts/build.sh YOUR_DEVELOPMENT_TEAM
 ```
 
-Team IDは引数で指定し、証明書・秘密鍵・ビルド成果物はGit管理しません。Spotlight/App Intentsの実機検証にはTeam ID付き署名とAccessibility権限が必要です。
+The development target and executable names remain `PromptInsertProbe` for compatibility. The app display name is Ayre. The build script outputs the app path, CLI, and receiver. Use a Team ID and Apple Development signature for Spotlight/App Intents testing; ad-hoc signing previously prevented Shortcuts from communicating with the app.
 
-## 構成
+Install the built app in `/Applications`, launch it once, and grant Accessibility permission in System Settings > Privacy & Security > Accessibility. Preserve a backup before replacing an existing installation. Changing the signing identity or Bundle ID may require granting permission again. Spotlight may need time to refresh its command index.
 
-- `App/`: AppKit UI、ホットキー、App Intents
-- `Sources/Core/`: 対象入力欄の取得、挿入、検証、Markdown保存
-- `Sources/CLI/`: 診断・サンプル生成CLI
-- `Sources/Receiver/`: 受け手側で全文比較する検証用アプリ
-- `Tests/`: コアのテスト
-- `verification/`: 検証履歴と検証版の詳細ガイド
+Do not commit signing keys, credentials, build products, or local diagnostic logs. Supply the development team through the build command rather than committing a personal Team ID.
 
-## 検証済みの範囲
+## Development tools
 
-19件のコアテストが成功。CodexへのSpotlight経由の長文入力（約53KB）はUTF-16単位の全文一致と末尾カーソル復元を確認済みです。パラメータなしの最新プロンプトコマンドはビルド・登録情報の確認までで、実挿入は未確認です。
+```sh
+swift run PromptInsertProbeCLI prompts
+swift run PromptInsertProbeCLI export-samples
+swift run PromptInsertProbeCLI inspect --delay 5
+swift run PromptInsertProbeCLI insert --sample short --delay 5 --method auto
+bash scripts/diag.sh > /tmp/ayre-diag.txt
+```
+
+`export-samples` creates three acceptance-test prompts without overwriting existing files unless `--force` is supplied. Sample bodies include Japanese, emoji, combining characters, code fences, and whitespace to exercise exact Unicode handling. Review diagnostic output before sharing it.
+
+## Source layout
+
+- `App/`: AppKit UI, global hotkey, and App Intents.
+- `Sources/Core/`: target capture, insertion, strict comparison, and Markdown storage.
+- `Sources/CLI/`: diagnostics and sample export.
+- `Sources/Receiver/`: independent receiver for exact comparison.
+- `Tests/`: core unit tests.
+- `verification/`: hardware test results and investigation notes.
+
+## Validation
+
+The imported baseline passed 19 core tests. A roughly 53 KB, 424-line prompt inserted into an empty Codex field through Spotlight matched the expected text exactly in UTF-16, with the caret restored to the end. The parameter-free latest-prompt command has passed build and metadata checks; its end-to-end insertion is still awaiting hardware confirmation. English command titles require a fresh build and Spotlight verification.

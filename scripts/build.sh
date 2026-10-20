@@ -15,5 +15,5 @@ echo
 echo "CLI:      $(swift build -c release --show-bin-path)/PromptInsertProbeCLI"
 echo "Receiver: $(swift build -c release --show-bin-path)/PromptInsertProbeReceiver"
 echo "App:      $app"
-echo "Spotlight/App Intentsの検証では、App を /Applications へコピーしてから起動してください:"
+echo "For Spotlight/App Intents testing, copy the app to /Applications before launching:"
 echo "  rm -rf /Applications/PromptInsertProbe.app && cp -R $app /Applications/ && open /Applications/PromptInsertProbe.app"

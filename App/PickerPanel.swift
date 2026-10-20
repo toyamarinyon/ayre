@@ -57,7 +57,7 @@ final class PickerController: NSObject, NSWindowDelegate, NSTableViewDataSource,
         case .success(let t):
             Focus.logReport(t)
             if t.pid == getpid() {
-                errorText = "フォーカスがPromptInsertProbe自身にあります"
+                errorText = "Focus is on Ayre itself"
             } else if case .failure(let e) = Focus.checkEditable(t) {
                 errorText = e.description
             } else {
@@ -77,7 +77,7 @@ final class PickerController: NSObject, NSWindowDelegate, NSTableViewDataSource,
         let panel = KeyablePanel(contentRect: NSRect(x: 0, y: 0, width: 560, height: 380),
                                  styleMask: [.titled, .closable, .nonactivatingPanel, .utilityWindow],
                                  backing: .buffered, defer: false)
-        panel.title = "Promptを入力"
+        panel.title = "Ayre Pick"
         panel.level = .floating
         panel.hidesOnDeactivate = false
         panel.becomesKeyOnlyIfNeeded = false
@@ -86,10 +86,10 @@ final class PickerController: NSObject, NSWindowDelegate, NSTableViewDataSource,
 
         var views: [NSView] = []
         if let errorText {
-            views.append(NSTextField(wrappingLabelWithString: "挿入できません: \(errorText)"))
-            footer.stringValue = "入力欄にカーソルを置いてから ⌃⌥⌘P を押してください。Escで閉じます。"
+            views.append(NSTextField(wrappingLabelWithString: "Cannot insert: \(errorText)"))
+            footer.stringValue = "Place the cursor in a text field, then press ⌃⌥⌘P. Press Esc to close."
         } else {
-            search.placeholderString = "検索（タイトル・slug）"
+            search.placeholderString = "Search titles and slugs"
             search.stringValue = ""
             search.delegate = self
             views.append(search)
@@ -116,18 +116,18 @@ final class PickerController: NSObject, NSWindowDelegate, NSTableViewDataSource,
     }
 
     private func footerText(skipped: Int) -> String {
-        let where_ = "対象: \(target?.appName ?? "?")"
+        let where_ = "Target: \(target?.appName ?? "?")"
         if all.isEmpty {
-            return "\(where_)\n保存済みプロンプトがありません。\(store.directory.path) に <slug>.md を置いてください。"
+            return "\(where_)\nNo saved prompts. Place <slug>.md files in \(store.directory.path)."
         }
-        let skippedText = skipped > 0 ? "　読めないファイル \(skipped) 件を除外" : ""
-        if shown.isEmpty { return "検索に一致するプロンプトがありません。Esc: 中止" }
-        return "\(where_)　\(shown.count)件　Return: 挿入（送信はしません）　↑↓: 選択　Esc: 中止\(skippedText)"
+        let skippedText = skipped > 0 ? "  Unreadable files skipped: \(skipped)" : ""
+        if shown.isEmpty { return "No matching prompts. Esc: cancel" }
+        return "\(where_)  \(shown.count) prompts  Return: insert (never sends)  ↑↓: select  Esc: cancel\(skippedText)"
     }
 
     private func makeTable() -> NSView {
         if table.tableColumns.isEmpty {
-            for (id, title, width) in [("title", "タイトル", 260.0), ("slug", "slug", 130.0), ("info", "更新・サイズ", 140.0)] {
+            for (id, title, width) in [("title", "Title", 260.0), ("slug", "slug", 130.0), ("info", "Updated / Lines", 140.0)] {
                 let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
                 column.title = title
                 column.width = width
@@ -157,7 +157,7 @@ final class PickerController: NSObject, NSWindowDelegate, NSTableViewDataSource,
         switch tableColumn?.identifier.rawValue {
         case "title": text = p.title
         case "slug": text = p.slug
-        default: text = "\(Self.dateFormat.string(from: p.modified))  \(p.lineCount)行"
+        default: text = "\(Self.dateFormat.string(from: p.modified))  \(p.lineCount) lines"
         }
         let label = NSTextField(labelWithString: text)
         label.lineBreakMode = .byTruncatingTail
@@ -206,8 +206,8 @@ final class PickerController: NSObject, NSWindowDelegate, NSTableViewDataSource,
         do {
             text = try store.text(prompt.slug)
         } catch {
-            ProbeLog.log("ABORT (書き込みなし): \(error)")
-            footer.stringValue = "読み込めません: \(error)"
+            ProbeLog.log("ABORT (nothing written): \(error)")
+            footer.stringValue = "Cannot read: \(error)"
             NSSound.beep()
             return
         }
@@ -223,7 +223,7 @@ final class PickerController: NSObject, NSWindowDelegate, NSTableViewDataSource,
             self?.logFocusState("after close")
             switch Focus.validateStillFocused(target) {
             case .failure(let e):
-                ProbeLog.log("ABORT (書き込みなし): \(e)")
+                ProbeLog.log("ABORT (nothing written): \(e)")
                 NSSound.beep()
             case .success:
                 let method = InsertionStrategy.method(for: target)

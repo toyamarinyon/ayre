@@ -8,9 +8,9 @@ public enum Verification: CustomStringConvertible {
 
     public var description: String {
         switch self {
-        case .exact: return "EXACT（AXValueの挿入前後をUTF-16単位で厳密比較して一致）"
-        case .mismatch(let d): return "MISMATCH（\(d)）"
-        case .unverifiable(let r): return "UNVERIFIABLE（\(r)）"
+        case .exact: return "EXACT (exact UTF-16 comparison of AXValue before and after insertion)"
+        case .mismatch(let d): return "MISMATCH (\(d))"
+        case .unverifiable(let r): return "UNVERIFIABLE (\(r))"
         }
     }
 }
@@ -27,8 +27,8 @@ public enum Inserter {
     public enum Method: String {
         case selectedText = "AXSelectedText"
         case value = "AXValue"
-        case emptyValue = "AXValue (空欄確認済み)"
-        case codexValue = "AXValue (Codex空欄自動判別)"
+        case emptyValue = "AXValue (confirmed empty field)"
+        case codexValue = "AXValue (Codex automatic empty-field detection)"
     }
 
     public static func insert(_ text: String, into target: FocusTarget, method: Method = .selectedText) -> Result<InsertOutcome, ProbeError> {
@@ -44,7 +44,7 @@ public enum Inserter {
             for attribute in ["AXPlaceholderValue", kAXTitleAttribute as String, kAXDescriptionAttribute as String] {
                 let (error, raw) = AX.copy(el, attribute)
                 let label = AX.string(el, attribute)
-                ProbeLog.log("empty diagnostic: \(attribute) read=\(axErrorName(error)) shape=\(AX.describeShape(raw)) valueMatchesLabelOrLabelWithLF=\(label.map { StrictCompare.matchesLabel(beforeValue, label: $0) } ?? false)（一致だけでは空欄と判定しない）")
+                ProbeLog.log("empty diagnostic: \(attribute) read=\(axErrorName(error)) shape=\(AX.describeShape(raw)) valueMatchesLabelOrLabelWithLF=\(label.map { StrictCompare.matchesLabel(beforeValue, label: $0) } ?? false) (a label match alone does not prove the field is empty)")
             }
         }
 
@@ -60,13 +60,13 @@ public enum Inserter {
                   beforeCount == beforeValue.utf16.count,
                   let expected = StrictCompare.expected(before: beforeValue,
                       range: NSRange(location: beforeRange.location, length: beforeRange.length), inserted: text) else {
-                return .failure(.targetChanged("AXValue全文・文字数・選択範囲を確認できないため書き込み中止"))
+                return .failure(.targetChanged("Write aborted: cannot verify the full AXValue, character count, and selection"))
             }
             if method == .codexValue, target.bundleID == InsertionStrategy.codexBundleID {
                 let decision = CodexFieldState.inspect(target)
-                ProbeLog.log("Codex field state=\(decision.rawValue)（子要素の編集属性による判別）")
+                ProbeLog.log("Codex field state=\(decision.rawValue) (determined from descendant editability attributes)")
                 guard decision != .unknown else {
-                    return .failure(.targetChanged("Codexの入力構造を判別できないため書き込み中止"))
+                    return .failure(.targetChanged("Write aborted: unknown Codex field structure"))
                 }
                 codexDecision = decision
                 logicalEmpty = decision == .empty
@@ -77,10 +77,10 @@ public enum Inserter {
                     .compactMap { AX.string(el, $0) }
                 guard beforeRange.location == 0, beforeRange.length == 0,
                       beforeValue.isEmpty || labels.contains(where: { StrictCompare.matchesLabel(beforeValue, label: $0) }) else {
-                    return .failure(.targetChanged("空欄確認モード: 本文が空/UIラベル一致、かつ選択範囲が{0,0}という条件を満たさないため中止"))
+                    return .failure(.targetChanged("Empty-field mode aborted: text must be empty or match the UI label, with selection {0,0}"))
                 }
                 payload = text
-                ProbeLog.log("explicit empty-field mode: ユーザーによる空欄確認を前提にサンプルのみ書き込む")
+                ProbeLog.log("explicit empty-field mode: inserting only the sample, assuming the user confirmed the field is empty")
             } else {
                 payload = expected
             }
@@ -90,14 +90,14 @@ public enum Inserter {
                   let currentRange = AX.range(el, kAXSelectedTextRangeAttribute),
                   currentRange.location == beforeRange.location, currentRange.length == beforeRange.length,
                   AX.int(el, kAXNumberOfCharactersAttribute) == beforeCount else {
-                return .failure(.targetChanged("読み取り後に本文または選択範囲が変化したため書き込み中止"))
+                return .failure(.targetChanged("Write aborted: text or selection changed after reading"))
             }
             if let codexDecision {
                 guard CodexFieldState.inspect(target) == codexDecision,
                       let finalValue = AX.string(el, kAXValueAttribute), StrictCompare.equal(finalValue, beforeValue),
                       let finalRange = AX.range(el, kAXSelectedTextRangeAttribute),
                       finalRange.location == beforeRange.location, finalRange.length == beforeRange.length else {
-                    return .failure(.targetChanged("書き込み直前にCodexの状態が変化、または判別不能"))
+                    return .failure(.targetChanged("Codex state changed or became unknown immediately before writing"))
                 }
             }
         } else {
@@ -131,12 +131,12 @@ public enum Inserter {
               AX.int(el, kAXNumberOfCharactersAttribute) == actual.utf16.count,
               offset >= 0, offset <= actual.utf16.count,
               StrictCompare.equal(actual, expected) || StrictCompare.removedTerminalLineEnding(actual: actual, expected: expected) != nil else {
-            ProbeLog.log("caret restore: SKIPPED（本文・文字数・フォーカスを確認できない）")
+            ProbeLog.log("caret restore: SKIPPED (cannot verify text, character count, and focus)")
             return
         }
         let (check, settable) = AX.isSettable(el, kAXSelectedTextRangeAttribute)
         guard check == .success, settable else {
-            ProbeLog.log("caret restore: SKIPPED（AXSelectedTextRangeに書き込めない）")
+            ProbeLog.log("caret restore: SKIPPED (AXSelectedTextRange is not writable)")
             return
         }
         var range = CFRange(location: offset, length: 0)
@@ -148,12 +148,12 @@ public enum Inserter {
         repeat {
             guard case .success = Focus.validateStillFocused(target),
                   let current = AX.string(el, kAXValueAttribute), StrictCompare.equal(current, actual) else {
-                ProbeLog.log("caret restore: UNVERIFIABLE（本文またはフォーカスが変化）")
+                ProbeLog.log("caret restore: UNVERIFIABLE (text or focus changed)")
                 return
             }
             if let readback = AX.range(el, kAXSelectedTextRangeAttribute),
                readback.location == offset, readback.length == 0 {
-                ProbeLog.log("caret restore: EXACT {\(offset),0}（本文不変）")
+                ProbeLog.log("caret restore: EXACT {\(offset),0} (text unchanged)")
                 return
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.05))
@@ -163,14 +163,14 @@ public enum Inserter {
     }
 
     static func verify(_ el: AXUIElement, text: String, beforeValue: String?, beforeRange: CFRange?, beforeCount: Int?) -> Verification {
-        guard let beforeValue else { return .unverifiable("挿入前のAXValueを読めない") }
-        guard let beforeRange else { return .unverifiable("挿入前のAXSelectedTextRangeを読めない") }
+        guard let beforeValue else { return .unverifiable("Cannot read AXValue before insertion") }
+        guard let beforeRange else { return .unverifiable("Cannot read AXSelectedTextRange before insertion") }
         if let beforeCount, beforeCount != beforeValue.utf16.count {
-            return .unverifiable("挿入前のAXValue長(\(beforeValue.utf16.count))とAXNumberOfCharacters(\(beforeCount))が不一致。AXValueが本文全体ではない可能性")
+            return .unverifiable("AXValue length before insertion (\(beforeValue.utf16.count)) differs from AXNumberOfCharacters (\(beforeCount)); AXValue may not contain the full text")
         }
         let range = NSRange(location: beforeRange.location, length: beforeRange.length)
         guard let expected = StrictCompare.expected(before: beforeValue, range: range, inserted: text) else {
-            return .unverifiable("選択範囲がAXValueの範囲外")
+            return .unverifiable("Selection is outside AXValue")
         }
 
         // Apps may apply the change asynchronously; poll briefly.
@@ -182,7 +182,7 @@ public enum Inserter {
             RunLoop.current.run(until: Date().addingTimeInterval(0.1))
         } while Date() < deadline
 
-        guard let after else { return .unverifiable("挿入後のAXValueを読めない") }
+        guard let after else { return .unverifiable("Cannot read AXValue after insertion") }
         let afterRange = AX.range(el, kAXSelectedTextRangeAttribute)
         let afterCount = AX.int(el, kAXNumberOfCharactersAttribute)
         let caretExpected = beforeRange.location + text.utf16.count
@@ -190,23 +190,23 @@ public enum Inserter {
         ProbeLog.log("after: value=String(\(TextStats(after))) AXNumberOfCharacters=\(afterCount.map(String.init) ?? "unreadable") \(caretInfo)")
 
         if let afterCount, afterCount != after.utf16.count {
-            return .unverifiable("挿入後のAXValue長(\(after.utf16.count))とAXNumberOfCharacters(\(afterCount))が不一致")
+            return .unverifiable("AXValue length after insertion (\(after.utf16.count)) differs from AXNumberOfCharacters (\(afterCount)) does not match")
         }
         if StrictCompare.equal(after, expected) { return .exact }
 
         var notes = ["expectedUTF16=\(expected.utf16.count)", "actualUTF16=\(after.utf16.count)"]
         if let ending = StrictCompare.removedTerminalLineEnding(actual: after, expected: expected) {
-            notes.append("差分は期待値末尾の\(ending)1個の欠落のみ（厳密一致ではない）")
+            notes.append("Only one trailing \(ending) is missing from the expected value (not an exact match)")
         }
         if let d = StrictCompare.firstDifferenceUTF16(after, expected) { notes.append("firstDiffAtUTF16=\(d)") }
         if StrictCompare.equal(after, text) && !beforeValue.isEmpty && beforeRange.length != beforeValue.utf16.count {
-            notes.append("既存本文が丸ごと置換された")
+            notes.append("All existing text was replaced")
         }
         let occ = StrictCompare.occurrences(of: text, in: after) - StrictCompare.occurrences(of: text, in: beforeValue)
-        notes.append("挿入本文の出現回数の増分=\(occ)")
-        if after == expected { notes.append("正規化(NFC/NFD)差のみ") }
+        notes.append("Increase in inserted-text occurrences=\(occ)")
+        if after == expected { notes.append("Only Unicode normalization (NFC/NFD) differs") }
         if after.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n") == expected {
-            notes.append("改行コードの差のみ")
+            notes.append("Only line endings differ")
         }
         return .mismatch(notes.joined(separator: " "))
     }
@@ -225,7 +225,7 @@ public enum ProbeEnvironment {
         ProbeLog.log("executable=\(Bundle.main.executablePath ?? CommandLine.arguments[0])")
         ProbeLog.log("AXIsProcessTrusted=\(AXIsProcessTrusted())")
         if Bundle.main.bundleIdentifier == nil {
-            ProbeLog.log("note: 非バンドルCLIのAccessibility権限は、起動元のターミナルアプリ（Terminal/iTerm等）に対して判定されます")
+            ProbeLog.log("note: For an unbundled CLI, Accessibility permission is evaluated for the launching terminal app (Terminal/iTerm, etc.).")
         }
         ProbeLog.log("log=\(ProbeLog.logURL.path)")
     }

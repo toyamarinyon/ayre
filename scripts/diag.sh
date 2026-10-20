@@ -17,9 +17,9 @@ while IFS= read -r app; do
   echo "path: $app"
   echo "bundleID: $(defaults read "$plist" CFBundleIdentifier 2>/dev/null)"
   echo "version: $(defaults read "$plist" CFBundleShortVersionString 2>/dev/null) ($(defaults read "$plist" CFBundleVersion 2>/dev/null))"
-  if [[ -d "$app/Contents/Frameworks/Electron Framework.framework" ]]; then echo "electron: yes"; else echo "electron: no (Electron Framework.framework なし)"; fi
+  if [[ -d "$app/Contents/Frameworks/Electron Framework.framework" ]]; then echo "electron: yes"; else echo "electron: no (Electron Framework.framework not found)"; fi
 done < <(mdfind 'kMDItemContentType == "com.apple.application-bundle" && kMDItemDisplayName == "Codex*"c' 2>/dev/null)
-[[ $found == 0 ]] && echo "Codex.app が見つかりません（mdfind）"
+[[ $found == 0 ]] && echo "Codex.app not found (mdfind)"
 echo "## PromptInsertProbe.app"
 for app in /Applications/PromptInsertProbe.app build/DerivedData/Build/Products/Debug/PromptInsertProbe.app; do
   [[ -d "$app" ]] || continue

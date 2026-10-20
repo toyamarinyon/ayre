@@ -6,7 +6,7 @@ import ProbeCore
 final class Receiver: NSObject, NSApplicationDelegate, NSTextViewDelegate {
     enum Scenario: Int, CaseIterable {
         case empty, middle, selection
-        var title: String { ["空の入力欄", "既存本文の途中へ挿入", "選択範囲の置換"][rawValue] }
+        var title: String { ["Empty field", "Insert within existing text", "Replace selection"][rawValue] }
         var baseline: (String, NSRange) {
             switch self {
             case .empty: return ("", NSRange(location: 0, length: 0))
@@ -25,7 +25,7 @@ final class Receiver: NSObject, NSApplicationDelegate, NSTextViewDelegate {
     let textView = NSTextView()
     let samplePopup = NSPopUpButton()
     let scenarioPopup = NSPopUpButton()
-    let resultLabel = NSTextField(wrappingLabelWithString: "シナリオを準備してください")
+    let resultLabel = NSTextField(wrappingLabelWithString: "Prepare a scenario")
     var baseline: (String, NSRange)?
     var edits: [String] = []
 
@@ -36,8 +36,8 @@ final class Receiver: NSObject, NSApplicationDelegate, NSTextViewDelegate {
         SamplePrompts.all.forEach { samplePopup.addItem(withTitle: "\($0.title) (\($0.id))") }
         Scenario.allCases.forEach { scenarioPopup.addItem(withTitle: $0.title) }
 
-        let prepare = NSButton(title: "シナリオを準備", target: self, action: #selector(prepare))
-        let verify = NSButton(title: "検証", target: self, action: #selector(verify))
+        let prepare = NSButton(title: "Prepare Scenario", target: self, action: #selector(prepare))
+        let verify = NSButton(title: "Verify", target: self, action: #selector(verify))
         let controls = NSStackView(views: [samplePopup, scenarioPopup, prepare, verify])
 
         textView.isRichText = false
@@ -82,7 +82,7 @@ final class Receiver: NSObject, NSApplicationDelegate, NSTextViewDelegate {
         window.makeFirstResponder(textView)
         baseline = (text, range)
         edits = []
-        let msg = "準備完了: \(scenario.title) / 期待する挿入: \(sample.title)。ターミナルで insert を実行し、Cmd+Tab でこのウィンドウに戻ってください（クリックするとカーソルが動きます）"
+        let msg = "Ready: \(scenario.title) / Expected insertion: \(sample.title). Run insert in your terminal, then Cmd+Tab back here (clicking moves the cursor)."
         resultLabel.stringValue = msg
         print("[receiver] \(msg)")
     }
@@ -93,17 +93,17 @@ final class Receiver: NSObject, NSApplicationDelegate, NSTextViewDelegate {
         let actual = textView.string
         var lines: [String] = []
         if StrictCompare.equal(actual, expected) {
-            lines.append("一致: UTF-16単位で期待値と完全一致（\(TextStats(actual))）")
+            lines.append("MATCH: exact UTF-16 match (\(TextStats(actual)))")
         } else {
-            lines.append("不一致: expected \(TextStats(expected)) / actual \(TextStats(actual))")
+            lines.append("MISMATCH: expected \(TextStats(expected)) / actual \(TextStats(actual))")
             if let d = StrictCompare.firstDifferenceUTF16(actual, expected) {
                 let ns = actual as NSString
                 let ctx = ns.substring(with: NSRange(location: max(0, d - 10), length: min(30, ns.length - max(0, d - 10))))
-                lines.append("最初の差分 UTF-16 offset=\(d) 付近: \(ctx.debugDescription)")
+                lines.append("First differing UTF-16 offset=\(d) near: \(ctx.debugDescription)")
             }
-            lines.append("挿入本文の出現回数: \(StrictCompare.occurrences(of: sample.text, in: actual))")
+            lines.append("Inserted text occurrences: \(StrictCompare.occurrences(of: sample.text, in: actual))")
         }
-        lines.append("編集イベント \(edits.count)件: \(edits.joined(separator: " / "))")
+        lines.append("Edit events: \(edits.count): \(edits.joined(separator: " / "))")
         resultLabel.stringValue = lines.joined(separator: "\n")
         lines.forEach { print("[receiver] \($0)") }
     }

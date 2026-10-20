@@ -18,11 +18,11 @@ public enum PromptStoreError: Error, CustomStringConvertible {
 
     public var description: String {
         switch self {
-        case .invalidSlug(let s): return "slugが不正です: \(s)"
-        case .notFound(let s): return "プロンプトが見つかりません: \(s)"
-        case .tooLarge(let s, let n): return "プロンプトが大きすぎます: \(s) (\(n) bytes > \(PromptStore.maxBytes))"
-        case .notUTF8(let s): return "UTF-8として読めません: \(s)"
-        case .alreadyExists(let s): return "既に存在します: \(s)"
+        case .invalidSlug(let s): return "Invalid slug: \(s)"
+        case .notFound(let s): return "Prompt not found: \(s)"
+        case .tooLarge(let s, let n): return "Prompt exceeds the size limit: \(s) (\(n) bytes > \(PromptStore.maxBytes))"
+        case .notUTF8(let s): return "Cannot decode UTF-8: \(s)"
+        case .alreadyExists(let s): return "Already exists: \(s)"
         }
     }
 }

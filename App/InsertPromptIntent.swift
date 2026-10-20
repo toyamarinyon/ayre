@@ -3,7 +3,7 @@ import AppKit
 import ApplicationServices
 
 struct PromptEntity: AppEntity {
-    static var typeDisplayRepresentation: TypeDisplayRepresentation = "プロンプト"
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Prompt"
     static var defaultQuery = PromptEntityQuery()
 
     let id: String
@@ -36,19 +36,19 @@ struct PromptEntityQuery: EntityStringQuery {
 
 struct IntentFailure: Error, CustomLocalizedStringResourceConvertible {
     let reason: String
-    var localizedStringResource: LocalizedStringResource { "挿入できません: \(reason)" }
+    var localizedStringResource: LocalizedStringResource { "Cannot insert: \(reason)" }
 }
 
 struct InsertPromptIntent: AppIntent {
-    static var title: LocalizedStringResource = "Promptを入力"
-    static var description = IntentDescription("保存済みのプロンプトを、元のアプリの入力欄へ挿入します（送信はしません）。")
+    static var title: LocalizedStringResource = "Ayre Pick"
+    static var description = IntentDescription("Choose a saved prompt and insert it into the original text field without sending.")
     static var openAppWhenRun: Bool = false
 
-    @Parameter(title: "プロンプト")
+    @Parameter(title: "Prompt")
     var prompt: PromptEntity
 
     static var parameterSummary: some ParameterSummary {
-        Summary("\(\.$prompt) を入力")
+        Summary("Insert \(\.$prompt)")
     }
 
     @MainActor
@@ -71,8 +71,8 @@ struct InsertPromptIntent: AppIntent {
 
 /// Parameter-free entry point: selects the most recently modified readable Markdown file.
 struct InsertLatestPromptIntent: AppIntent {
-    static var title: LocalizedStringResource = "最新のPromptを入力"
-    static var description = IntentDescription("保存フォルダで更新日時が最も新しいプロンプトを、選択せずに入力します（送信はしません）。同じ更新日時の場合はslug順です。")
+    static var title: LocalizedStringResource = "Ayre Go"
+    static var description = IntentDescription("Insert the most recently modified saved prompt without choosing. Never sends. Ties are resolved by slug.")
     static var openAppWhenRun: Bool = false
 
     @MainActor
@@ -81,8 +81,8 @@ struct InsertLatestPromptIntent: AppIntent {
         ProbeEnvironment.log()
         let store = PromptStore()
         guard let latest = store.list().prompts.first else {
-            ProbeLog.log("[perform] ABORT: 読み込める保存済みプロンプトがありません")
-            throw IntentFailure(reason: "読み込める保存済みプロンプトがありません")
+            ProbeLog.log("[perform] ABORT: No readable saved prompts found")
+            throw IntentFailure(reason: "No readable saved prompts found")
         }
         let text: String
         do {
@@ -135,8 +135,8 @@ enum IntentTargetResolver {
             Focus.logReport(t)
             return t
         }
-        ProbeLog.log("[perform] ABORT: 元の入力対象を特定できない")
-        throw IntentFailure(reason: "元の入力欄を特定できません（実行時のフォーカスがSpotlight等にあります）。ログを確認してください")
+        ProbeLog.log("[perform] ABORT: Cannot identify the original text field")
+        throw IntentFailure(reason: "Cannot identify the original text field; focus may still be on Spotlight. Check the log.")
     }
 
     /// perform() returns first so Spotlight can close. Then we wait for the captured element itself to be focused again.
@@ -150,7 +150,7 @@ enum IntentTargetResolver {
                 ProbeLog.log("[deferred] focus returned to target app after \(String(format: "%.2f", elapsed))s")
                 switch Focus.validateStillFocused(target) {
                 case .failure(let e):
-                    ProbeLog.log("[deferred] ABORT (書き込みなし): \(e)")
+                    ProbeLog.log("[deferred] ABORT (nothing written): \(e)")
                     NSSound.beep()
                 case .success:
                     let method = InsertionStrategy.method(for: target)
@@ -164,7 +164,7 @@ enum IntentTargetResolver {
             }
             if elapsed > 5 {
                 let bid = pid.flatMap { Focus.appInfo(pid: $0).bundleID } ?? "?"
-                ProbeLog.log("[deferred] ABORT: 5秒以内に対象アプリへフォーカスが戻らない (現在 pid=\(pid.map(String.init) ?? "?") \(bid))")
+                ProbeLog.log("[deferred] ABORT: Focus did not return to the target app within 5 seconds (current pid=\(pid.map(String.init) ?? "?") \(bid))")
                 NSSound.beep()
                 return
             }
@@ -184,14 +184,14 @@ struct ProbeShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: InsertLatestPromptIntent(),
-            phrases: ["\(.applicationName)で最新のPromptを入力", "Insert latest prompt with \(.applicationName)"],
-            shortTitle: "最新のPromptを入力",
+            phrases: ["Go with \(.applicationName)", "Insert latest prompt with \(.applicationName)"],
+            shortTitle: "Ayre Go",
             systemImageName: "clock.arrow.circlepath"
         )
         AppShortcut(
             intent: InsertPromptIntent(),
-            phrases: ["\(.applicationName)でPromptを入力", "Insert prompt with \(.applicationName)"],
-            shortTitle: "Promptを入力",
+            phrases: ["Pick a prompt with \(.applicationName)", "Insert prompt with \(.applicationName)"],
+            shortTitle: "Ayre Pick",
             systemImageName: "text.insert"
         )
     }
