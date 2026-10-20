@@ -20,8 +20,8 @@ while IFS= read -r app; do
   if [[ -d "$app/Contents/Frameworks/Electron Framework.framework" ]]; then echo "electron: yes"; else echo "electron: no (Electron Framework.framework not found)"; fi
 done < <(mdfind 'kMDItemContentType == "com.apple.application-bundle" && kMDItemDisplayName == "Codex*"c' 2>/dev/null)
 [[ $found == 0 ]] && echo "Codex.app not found (mdfind)"
-echo "## PromptInsertProbe.app"
-for app in /Applications/PromptInsertProbe.app build/DerivedData/Build/Products/Debug/PromptInsertProbe.app; do
+echo "## Ayre.app"
+for app in /Applications/Ayre.app build/DerivedData/Build/Products/Release/Ayre.app build/DerivedData/Build/Products/Debug/Ayre.app; do
   [[ -d "$app" ]] || continue
   echo "path: $app"
   codesign -dv "$app" 2>&1 | grep -E 'Identifier|TeamIdentifier|Signature|CDHash'

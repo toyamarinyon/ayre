@@ -1,63 +1,92 @@
 # Ayre
 
-Insert saved Markdown prompts into the focused text field on macOS, directly from Spotlight. Ayre uses Accessibility APIs, does not use the clipboard or synthetic keystrokes, and never sends your message.
+Ayre (pronounced “Air”) inserts saved Markdown prompts into the focused text field on macOS 14+. **Ayre Go** inserts the latest modified readable file; **Ayre Pick** lets you choose. Neither submits a message. Insertion uses Accessibility APIs, strict UTF-16 readback, and caret restoration. No clipboard or simulated keystrokes are used for insertion.
 
-## Commands
+## Install and onboarding
 
-- **Ayre Go**: insert the most recently modified readable prompt without choosing one. Modification-time ties are resolved by slug.
-- **Ayre Pick**: choose a saved prompt, then insert it.
-- **Control + Option + Command + P**: open the searchable picker; use arrow keys and Return to select, or Esc to cancel.
+Download a signed, notarized ZIP from [GitHub Releases](https://github.com/toyamarinyon/ayre/releases), when available, extract it, and move Ayre.app to a persistent location. Open Ayre to see settings. Grant Accessibility permission under System Settings → Privacy & Security → Accessibility. The app shows the actual permission status and provides a Request Permission button.
 
-Place the cursor in the destination field before invoking a command. Insertion proceeds only after focus returns to that same field. Unknown targets or field states abort without writing.
+Once permission is granted, install the Claude Code plugin by running these commands **inside Claude Code**:
 
-## Prompt files
+```text
+/plugin marketplace add toyamarinyon/ayre
+/plugin install ayre@ayre
+```
 
-The existing storage location is retained for compatibility:
+The settings window can copy these commands. Restart Claude Code if it requests it. Use `/ayre:use-ayre` to create or refine a reusable prompt and register it with Ayre. The plugin discovers a compatible CLI on PATH or finds the installed app through Launch Services; no PATH change or fixed installation directory is required. If the app has moved, open it once at its new location to refresh macOS registration.
+
+Place the cursor in the destination field, then invoke Ayre Go or Ayre Pick through Spotlight. The optional Control + Option + Command + P shortcut opens the picker while Ayre runs. Arrow keys and Return select a prompt; Esc cancels. Focus must return to the captured original field; unknown targets or field state cause an abort without writing. Ayre Go selects the latest **modified**, not latest used, file.
+
+## Settings, background operation, and login
+
+Closing settings hides the Dock icon and leaves Ayre running. Reopening the app shows settings and its Dock icon again. Spotlight/App Intent launches run without opening settings or taking focus. Launch at login is off until explicitly enabled in settings; its status comes from macOS Service Management rather than a saved preference. If Accessibility is missing during background startup, a menu-bar item provides a route to settings without opening a window. A pending login approval must be completed in System Settings → General → Login Items. See the status in Ayre if registration fails or is unavailable.
+
+Use Quit Ayre to stop the process. Disable Launch at login before uninstalling, quit Ayre, then remove the app and optionally uninstall the Claude plugin with `/plugin uninstall ayre@ayre`. Remove its marketplace with `/plugin marketplace remove ayre` if no longer needed. Prompt files and logs remain until you delete them deliberately.
+
+For updates, quit Ayre, back up the existing app, replace it with the new signed build, and open it again. Keep the same stable identity and signing team. Update the plugin with `/plugin marketplace update ayre` followed by `/plugin update ayre@ayre`. If Accessibility stops working after an update, review the app entry in System Settings.
+
+## Prompt storage and CLI contract
+
+The legacy storage and log paths are deliberately retained; no migration or deletion occurs:
 
 ```text
 ~/Library/Application Support/PromptInsertProbe/Prompts/<slug>.md
+~/Library/Logs/PromptInsertProbe/probe.log
 ```
 
-Files must be UTF-8 and no larger than 1,000,000 bytes. Slugs use ASCII letters, digits, dots, underscores, and hyphens, start with a letter or digit, and cannot contain consecutive dots. The first `# ` heading within the first 20 lines supplies the title; otherwise, the slug is displayed. The entire file, including its heading, is inserted unchanged.
+Files must be valid UTF-8 and at most 1,000,000 bytes. Slugs are at most 128 ASCII characters, start with a letter or digit, contain only letters, digits, dots, underscores or hyphens, and cannot contain `..`. The first nonempty `# ` heading within the first 20 lines supplies the title; otherwise the slug is displayed. The entire file, including that heading, is inserted unchanged. Edit files using any text editor; Ayre rereads a selected file before insertion. Existing user text is never translated or normalized.
 
-Edit these files with any text editor. Ayre reads the selected file again at insertion time. Existing user prompts are never translated. Japanese and other Unicode text in test fixtures is intentional.
+The bundled executable is `Ayre.app/Contents/MacOS/ayre`:
 
-## Build and test
+```sh
+"/path with spaces/Ayre.app/Contents/MacOS/ayre" --version
+"/path with spaces/Ayre.app/Contents/MacOS/ayre" capabilities --json
+"/path with spaces/Ayre.app/Contents/MacOS/ayre" put review --title "Review" < prompt.md
+# Intentional replacement only:
+"/path with spaces/Ayre.app/Contents/MacOS/ayre" put review --title "Review" --overwrite < prompt.md
+```
 
-Requires macOS 14 or later and Xcode.
+`--title` is an assertion, not metadata that changes the file: the example expects a `# Review` heading in the first 20 lines. For a heading-free body, use the slug as title. A mismatch fails with an actionable error. Registration preserves stdin UTF-8 bytes exactly, including CRLF, Unicode normalization, and trailing newlines. It does not require Accessibility, launch the app, activate a window, insert into another application, or submit anything. By default an existing slug is rejected; replacement requires `--overwrite`. Exit codes: 0 success, 2 usage/input validation, 3 existing slug, 4 storage or stdin I/O failure. Use `--store DIRECTORY` for isolated fixtures.
+
+App and plugin release version is **0.2.0**. Discovery requires CLI protocol **1** and the `put` capability, not an exact release-version match. `capabilities --json` provides `protocolVersion`, `version`, and `capabilities`. The stable app Bundle ID is `com.toyamarinyon.ayre`. This replaces the prototype's `dev.local.PromptInsertProbe`; **grant Accessibility to the new Ayre app again**. The old installation is not removed automatically.
+
+## Build and distribution
+
+Requires macOS 14+, Xcode, and SwiftPM. The Xcode project/scheme and internal core/receiver names retain prototype identifiers. The app product is Ayre.app (GUI executable `AyreApp`, bundled CLI `ayre`); `scripts/build.sh` is the canonical packaging path and embeds the CLI before signing.
 
 ```sh
 swift test
-bash scripts/build.sh YOUR_DEVELOPMENT_TEAM
+bash scripts/build.sh --unsigned
+# Local App Intents testing (supply your own usable certificate/team):
+bash scripts/build.sh --team YOUR_TEAM_ID
+# Public distribution, both Apple silicon and Intel:
+bash scripts/build.sh --identity "Developer ID Application: Your Name (TEAM)" --universal
 ```
 
-The development target and executable names remain `PromptInsertProbe` for compatibility. The app display name is Ayre. The build script outputs the app path, CLI, and receiver. Use a Team ID and Apple Development signature for Spotlight/App Intents testing; ad-hoc signing previously prevented Shortcuts from communicating with the app.
+Output: `build/DerivedData/Build/Products/Release/Ayre.app`. Unsigned builds are for compilation/fixture checks; an Apple Development signature is needed for reliable local App Intents testing. Raw `xcodebuild` builds the UI only; use the script to obtain the complete app with CLI. The default CLI build targets the host architecture; `--universal` builds both executables for arm64 and x86_64. Use `--derived-data DIRECTORY` to isolate build output when needed.
 
-Install the built app in `/Applications`, launch it once, and grant Accessibility permission in System Settings > Privacy & Security > Accessibility. Preserve a backup before replacing an existing installation. Changing the signing identity or Bundle ID may require granting permission again. Spotlight may need time to refresh its command index.
+Public distribution requires Apple Developer Program membership, a Developer ID Application certificate/private key, hardened runtime, and successful notarization. Apple Development/Personal Team and ad-hoc signatures do not establish public distribution readiness. See [Apple’s Developer ID guidance](https://developer.apple.com/developer-id/) and [notarization requirements](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).
 
-Do not commit signing keys, credentials, build products, or local diagnostic logs. Supply the development team through the build command rather than committing a personal Team ID.
-
-## Development tools
+Configure a notarytool Keychain profile yourself, then explicitly run:
 
 ```sh
-swift run PromptInsertProbeCLI prompts
-swift run PromptInsertProbeCLI export-samples
-swift run PromptInsertProbeCLI inspect --delay 5
-swift run PromptInsertProbeCLI insert --sample short --delay 5 --method auto
-bash scripts/diag.sh > /tmp/ayre-diag.txt
+bash scripts/release.sh "Developer ID Application: Your Name (TEAM)" YOUR_NOTARY_PROFILE
 ```
 
-`export-samples` creates three acceptance-test prompts without overwriting existing files unless `--force` is supplied. Sample bodies include Japanese, emoji, combining characters, code fences, and whitespace to exercise exact Unicode handling. Review diagnostic output before sharing it.
+The script builds a universal signed app, uploads it to Apple for notarization, staples and validates its ticket, verifies Gatekeeper acceptance, then creates `build/release/Ayre-0.2.0-macOS.zip` and prints its SHA-256. It does not publish a GitHub Release. Review the artifact and evidence before uploading publicly. Never commit certificates, credentials, signing settings, build output, logs, or user prompts.
 
-## Source layout
+## Development and validation
 
-- `App/`: AppKit UI, global hotkey, and App Intents.
-- `Sources/Core/`: target capture, insertion, strict comparison, and Markdown storage.
-- `Sources/CLI/`: diagnostics and sample export.
-- `Sources/Receiver/`: independent receiver for exact comparison.
-- `Tests/`: core unit tests.
-- `verification/`: hardware test results and investigation notes.
+```sh
+swift run ayre --help
+swift run ayre prompts
+swift run ayre export-samples
+swift run ayre inspect --delay 5
+swift run ayre insert --sample short --delay 5 --method auto
+bash plugins/ayre/tests/test-helper.sh
+python3 scripts/verify-package.py
+claude plugin validate .
+claude plugin validate plugins/ayre
+```
 
-## Validation
-
-The imported baseline passed 19 core tests. A roughly 53 KB, 424-line prompt inserted into an empty Codex field through Spotlight matched the expected text exactly in UTF-16, with the caret restored to the end. The parameter-free latest-prompt command has passed build and metadata checks; its end-to-end insertion is still awaiting hardware confirmation. English command titles require a fresh build and Spotlight verification.
+Sample export is explicit and does not overwrite existing files without `--force`. Unicode fixture content is intentional. Insertion code lives in `Sources/Core/`; UI, picker, and App Intents in `App/`; diagnostic receiver in `Sources/Receiver/`. Current implementation evidence and remaining manual checks are recorded in [0.2.0 verification](verification/implementation-0.2.0.md); earlier insertion evidence is in [hardware results](verification/results.md). Test registration against temporary directories, never the user's real prompts.

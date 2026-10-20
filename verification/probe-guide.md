@@ -1,6 +1,6 @@
 # Prototype verification guide
 
-This project originated as PromptInsertProbe. Executable names, the Bundle ID, prompt storage, and log paths retain that identifier for compatibility. User-facing labels and command titles are English; see the [README](../README.md) for current usage.
+This project originated as PromptInsertProbe. Internal project and receiver names, prompt storage, and log paths retain that identifier for compatibility. The app is Ayre.app with Bundle ID com.toyamarinyon.ayre; use scripts/build.sh for complete CLI packaging. User-facing labels and command titles are English; see the [README](../README.md) for current usage.
 
 ## Receiver tests
 
