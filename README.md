@@ -27,12 +27,14 @@ For updates, quit Ayre, back up the existing app, replace it with the new signed
 
 ## Prompt storage and CLI contract
 
-The legacy storage and log paths are deliberately retained; no migration or deletion occurs:
+Prompts are stored in the Ayre folder. Diagnostic logs retain their legacy location:
 
 ```text
-~/Library/Application Support/PromptInsertProbe/Prompts/<slug>.md
+~/Library/Application Support/Ayre/Prompts/<slug>.md
 ~/Library/Logs/PromptInsertProbe/probe.log
 ```
+
+On first use, Ayre copies regular Markdown files from the old `Application Support/PromptInsertProbe/Prompts` folder. Original files and modification dates are retained, and existing destination entries are never overwritten. A completion marker prevents deleted prompts being reimported on later launches. Symlinks are not imported. If migration fails, the error is logged and the legacy folder remains in use so existing prompts stay accessible. Updates made with an older app after migration are not synced; quit the old version and use the new app and its bundled CLI.
 
 Files must be valid UTF-8 and at most 1,000,000 bytes. Slugs are at most 128 ASCII characters, start with a letter or digit, contain only letters, digits, dots, underscores or hyphens, and cannot contain `..`. The first nonempty `# ` heading within the first 20 lines supplies the title; otherwise the slug is displayed. The entire file, including that heading, is inserted unchanged. Edit files using any text editor; Ayre rereads a selected file before insertion. Existing user text is never translated or normalized.
 
@@ -48,7 +50,7 @@ The bundled executable is `Ayre.app/Contents/MacOS/ayre`:
 
 `--title` is an assertion, not metadata that changes the file: the example expects a `# Review` heading in the first 20 lines. For a heading-free body, use the slug as title. A mismatch fails with an actionable error. Registration preserves stdin UTF-8 bytes exactly, including CRLF, Unicode normalization, and trailing newlines. It does not require Accessibility, launch the app, activate a window, insert into another application, or submit anything. By default an existing slug is rejected; replacement requires `--overwrite`. Exit codes: 0 success, 2 usage/input validation, 3 existing slug, 4 storage or stdin I/O failure. Use `--store DIRECTORY` for isolated fixtures.
 
-App and plugin release version is **0.2.0**. Discovery requires CLI protocol **1** and the `put` capability, not an exact release-version match. `capabilities --json` provides `protocolVersion`, `version`, and `capabilities`. The stable app Bundle ID is `com.toyamarinyon.ayre`. This replaces the prototype's `dev.local.PromptInsertProbe`; **grant Accessibility to the new Ayre app again**. The old installation is not removed automatically.
+App and plugin release version is **0.2.1**. Discovery requires CLI protocol **1** and the `put` capability, not an exact release-version match. `capabilities --json` provides `protocolVersion`, `version`, and `capabilities`. The stable app Bundle ID is `com.toyamarinyon.ayre`. This replaces the prototype's `dev.local.PromptInsertProbe`; **grant Accessibility to the new Ayre app again**. The old installation is not removed automatically.
 
 ## Build and distribution
 
@@ -73,7 +75,7 @@ Configure a notarytool Keychain profile yourself, then explicitly run:
 bash scripts/release.sh "Developer ID Application: Your Name (TEAM)" YOUR_NOTARY_PROFILE
 ```
 
-The script builds a universal signed app, uploads it to Apple for notarization, staples and validates its ticket, verifies Gatekeeper acceptance, then creates `build/release/Ayre-0.2.0-macOS.zip` and prints its SHA-256. It does not publish a GitHub Release. Review the artifact and evidence before uploading publicly. Never commit certificates, credentials, signing settings, build output, logs, or user prompts.
+The script builds a universal signed app, uploads it to Apple for notarization, staples and validates its ticket, verifies Gatekeeper acceptance, then creates `build/release/Ayre-0.2.1-macOS.zip` and prints its SHA-256. It does not publish a GitHub Release. Review the artifact and evidence before uploading publicly. Never commit certificates, credentials, signing settings, build output, logs, or user prompts.
 
 ## Development and validation
 
@@ -104,4 +106,4 @@ Set these repository Actions secrets before running it:
 - `APPLE_TEAM_ID`: the signing certificate's Developer team.
 - `APPLE_APP_SPECIFIC_PASSWORD`: an app-specific password, not the normal account password.
 
-Use **Actions → Signed macOS release → Run workflow**, choosing `main` and tag `v0.2.0`. Only run trusted reviewed code: release workflows can access signing secrets. The hosted runner is ephemeral, and an always-run cleanup removes its temporary signing keychain. Review and download-test the draft artifact before publishing. Update the workflow version guard and archive names together when preparing a new app version.
+Use **Actions → Signed macOS release → Run workflow**, choosing `main` and tag `v0.2.1`. Only run trusted reviewed code: release workflows can access signing secrets. The hosted runner is ephemeral, and an always-run cleanup removes its temporary signing keychain. Review and download-test the draft artifact before publishing. Update the workflow version guard and archive names together when preparing a new app version.

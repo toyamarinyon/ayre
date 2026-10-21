@@ -1,7 +1,7 @@
 {
   "name": "ayre",
   "description": "Create or refine a reusable prompt and save it to Ayre without inserting or sending it.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": {
     "name": "Toyama Rinyon",
     "url": "https://github.com/toyamarinyon"

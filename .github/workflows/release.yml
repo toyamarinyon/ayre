@@ -6,7 +6,7 @@ on:
       tag:
         description: Release tag (must match the app version)
         required: true
-        default: v0.2.0
+        default: v0.2.1
         type: string
 
 permissions:
@@ -34,8 +34,8 @@ jobs:
           python3 - <<'PY'
           import os, re
           tag = os.environ['RELEASE_TAG']
-          if tag != 'v0.2.0' or not re.fullmatch(r'v\d+\.\d+\.\d+', tag):
-              raise SystemExit('The current app version requires tag v0.2.0')
+          if tag != 'v0.2.1' or not re.fullmatch(r'v\d+\.\d+\.\d+', tag):
+              raise SystemExit('The current app version requires tag v0.2.1')
           PY
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo 'A release already exists for this tag; refusing to replace it.' >&2
@@ -108,10 +108,10 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          archive=build/release/Ayre-0.2.0-macOS.zip
-          (cd build/release && shasum -a 256 Ayre-0.2.0-macOS.zip > SHA256SUMS)
+          archive=build/release/Ayre-0.2.1-macOS.zip
+          (cd build/release && shasum -a 256 Ayre-0.2.1-macOS.zip > SHA256SUMS)
           cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
-          Ayre 0.2.0 for macOS 14 and later (Apple Silicon and Intel).
+          Ayre 0.2.1 for macOS 14 and later (Apple Silicon and Intel).
 
           Download the ZIP, extract Ayre.app, move it to a persistent location, and open it to grant Accessibility permission. Install the Claude Code plugin using the commands shown in Settings. Use Ayre Go or Ayre Pick in Spotlight to insert saved prompts without sending.
 

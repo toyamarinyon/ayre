@@ -17,7 +17,7 @@ cli = app / 'Contents/MacOS/ayre'
 with (app / 'Contents/Info.plist').open('rb') as file:
     info = plistlib.load(file)
 assert info['CFBundleIdentifier'] == 'com.toyamarinyon.ayre'
-assert info['CFBundleShortVersionString'] == '0.2.0'
+assert info['CFBundleShortVersionString'] == '0.2.1'
 assert info['LSUIElement'] is True
 gui = app / 'Contents/MacOS' / info['CFBundleExecutable']
 assert gui.is_file()
@@ -37,7 +37,7 @@ caps = run('capabilities', '--json')
 assert caps.returncode == 0, caps.stderr
 capabilities = json.loads(caps.stdout)
 assert capabilities['protocolVersion'] == 1 and 'put' in capabilities['capabilities']
-assert capabilities['version'] == '0.2.0'
+assert capabilities['version'] == '0.2.1'
 with tempfile.TemporaryDirectory(prefix='Ayre packaged CLI ') as directory:
     target = pathlib.Path(directory) / 'unicode.md'
     body = '# Exact title\r\n\r\n日本語 👨‍👩‍👧‍👦 e\u0301\nTrailing spaces  \r\n'.encode('utf-8')

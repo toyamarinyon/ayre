@@ -1,5 +1,6 @@
 import Foundation
 import XCTest
+import ProbeCore
 
 final class CLIIntegrationTests: XCTestCase {
     private var executable: URL {
@@ -28,7 +29,7 @@ final class CLIIntegrationTests: XCTestCase {
         XCTAssertEqual(capabilities.0, 0)
         let response = try XCTUnwrap(JSONSerialization.jsonObject(with: capabilities.1) as? [String: Any])
         XCTAssertEqual(response["protocolVersion"] as? Int, 1)
-        XCTAssertEqual(response["version"] as? String, "0.2.0")
+        XCTAssertEqual(response["version"] as? String, CLIContract.version)
         XCTAssertEqual(response["capabilities"] as? [String], ["put"])
 
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("ayre-cli-\(UUID().uuidString)", isDirectory: true)

@@ -11,7 +11,7 @@ bash scripts/build.sh --identity "$1" --universal
 app=build/DerivedData/Build/Products/Release/Ayre.app
 python3 scripts/verify-package.py "$app" --distribution
 mkdir -p build/release
-archive=build/release/Ayre-0.2.0-macOS.zip
+archive=build/release/Ayre-0.2.1-macOS.zip
 ditto -c -k --keepParent "$app" "$archive"
 xcrun notarytool submit "$archive" --keychain-profile "$2" --wait
 xcrun stapler staple "$app"
