@@ -1,6 +1,6 @@
 {
   "name": "ayre",
-  "description": "Claude Code plugin for creating reusable prompts and saving them to the Ayre macOS app.",
+  "description": "Claude Code skills for reusable prompts and self-contained Codex handoffs with Ayre.",
   "owner": {
     "name": "Toyama Rinyon",
     "url": "https://github.com/toyamarinyon"
@@ -9,7 +9,7 @@
     {
       "name": "ayre",
       "source": "./plugins/ayre",
-      "description": "Create or refine a reusable prompt, save it to Ayre, and use Ayre Go when you want to insert it."
+      "description": "Save reusable prompts or prepare a self-contained Codex handoff, then insert it with Ayre Go."
     }
   ]
 }

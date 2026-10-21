@@ -15,6 +15,10 @@ Once permission is granted, install the Claude Code plugin by running these comm
 
 The settings window can copy these commands. Restart Claude Code if it requests it. Use `/ayre:use-ayre` to create or refine a reusable prompt and register it with Ayre. The plugin discovers a compatible CLI on PATH or finds the installed app through Launch Services; no PATH change or fixed installation directory is required. If the app has moved, open it once at its new location to refresh macOS registration.
 
+Use `/ayre:handoff-codex` when an implementation discussion in Claude Code is ready to move to Codex. It creates a goal-first, self-contained implementation prompt, including the authorized destination workspace, decisions, acceptance checks, and a coordination plan using GPT-6 Luna subagents. It saves the result to Ayre without launching Codex or sending a message. Source Claude Code sessions and investigation workspaces are out of bounds for the receiving agents; restricted source details must be omitted or explicitly cleared for transfer. Necessary missing destination context is resolved before saving. Actual filesystem isolation still depends on Codex workspace permissions.
+
+Update an existing installation with `/plugin marketplace update ayre` and `/plugin update ayre@ayre`, then restart Claude Code if requested. The `handoff-codex` skill is included in plugin **0.2.2** and uses the existing protocol-1 CLI; no app update is required for this skill addition.
+
 Place the cursor in the destination field, then invoke Ayre Go or Ayre Pick through Spotlight. The optional Control + Option + Command + P shortcut opens the picker while Ayre runs. Arrow keys and Return select a prompt; Esc cancels. Focus must return to the captured original field; unknown targets or field state cause an abort without writing. Ayre Go selects the latest **modified**, not latest used, file.
 
 ## Settings, background operation, and login
@@ -50,7 +54,7 @@ The bundled executable is `Ayre.app/Contents/MacOS/ayre`:
 
 `--title` is an assertion, not metadata that changes the file: the example expects a `# Review` heading in the first 20 lines. For a heading-free body, use the slug as title. A mismatch fails with an actionable error. Registration preserves stdin UTF-8 bytes exactly, including CRLF, Unicode normalization, and trailing newlines. It does not require Accessibility, launch the app, activate a window, insert into another application, or submit anything. By default an existing slug is rejected; replacement requires `--overwrite`. Exit codes: 0 success, 2 usage/input validation, 3 existing slug, 4 storage or stdin I/O failure. Use `--store DIRECTORY` for isolated fixtures.
 
-App and plugin release version is **0.2.1**. Discovery requires CLI protocol **1** and the `put` capability, not an exact release-version match. `capabilities --json` provides `protocolVersion`, `version`, and `capabilities`. The stable app Bundle ID is `com.toyamarinyon.ayre`. This replaces the prototype's `dev.local.PromptInsertProbe`; **grant Accessibility to the new Ayre app again**. The old installation is not removed automatically.
+The app release version is **0.2.1** and the Claude Code plugin version is **0.2.2**. Discovery requires CLI protocol **1** and the `put` capability, not an exact release-version match. `capabilities --json` provides `protocolVersion`, `version`, and `capabilities`. The stable app Bundle ID is `com.toyamarinyon.ayre`. This replaces the prototype's `dev.local.PromptInsertProbe`; **grant Accessibility to the new Ayre app again**. The old installation is not removed automatically.
 
 ## Build and distribution
 
