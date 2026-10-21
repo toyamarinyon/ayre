@@ -6,7 +6,6 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .executable(name: "ayre", targets: ["PromptInsertProbeCLI"]),
-        .executable(name: "PromptInsertProbeCLI", targets: ["PromptInsertProbeCLI"]),
         .executable(name: "PromptInsertProbeReceiver", targets: ["PromptInsertProbeReceiver"]),
     ],
     targets: [
