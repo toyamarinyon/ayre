@@ -91,3 +91,17 @@ claude plugin validate plugins/ayre
 ```
 
 Sample export is explicit and does not overwrite existing files without `--force`. Unicode fixture content is intentional. Insertion code lives in `Sources/Core/`; UI, picker, and App Intents in `App/`; diagnostic receiver in `Sources/Receiver/`. Current implementation evidence and remaining manual checks are recorded in [0.2.0 verification](verification/implementation-0.2.0.md); earlier insertion evidence is in [hardware results](verification/results.md). Test registration against temporary directories, never the user's real prompts.
+
+### GitHub Actions signing and notarization
+
+The **Signed macOS release** workflow runs manually from `main`. It tests the project, imports a Developer ID Application identity into a temporary keychain, builds the universal app, notarizes it, staples and validates the ticket, checks Gatekeeper acceptance, and creates a **draft** GitHub Release with a ZIP and SHA-256 checksums. It never publishes the draft automatically and refuses to replace an existing release.
+
+Set these repository Actions secrets before running it:
+
+- `APPLE_CERTIFICATE_P12_BASE64`: Base64-encoded password-protected certificate and private key export.
+- `APPLE_CERTIFICATE_PASSWORD`: export password.
+- `APPLE_ID`: Apple Account email for notarization.
+- `APPLE_TEAM_ID`: the signing certificate's Developer team.
+- `APPLE_APP_SPECIFIC_PASSWORD`: an app-specific password, not the normal account password.
+
+Use **Actions → Signed macOS release → Run workflow**, choosing `main` and tag `v0.2.0`. Only run trusted reviewed code: release workflows can access signing secrets. The hosted runner is ephemeral, and an always-run cleanup removes its temporary signing keychain. Review and download-test the draft artifact before publishing. Update the workflow version guard and archive names together when preparing a new app version.
