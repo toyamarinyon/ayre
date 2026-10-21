@@ -3,20 +3,24 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "ayre.js"
 
 
 def run(args, env):
-    return subprocess.run(
+    result = subprocess.run(
         ["/usr/bin/osascript", "-l", "JavaScript", str(SCRIPT), *args],
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        check=True,
+        check=False,
         timeout=15,
     )
+    if result.returncode != 0:
+        raise AssertionError(f"Ayre test helper failed: {result.stderr.decode(errors='replace')}")
+    return result
 
 
 
@@ -28,7 +32,7 @@ def test_timeout_fallback(root):
     slow_pid = root / "slow.pid"
     slow = slow_bin / "ayre"
     slow.write_text(
-        "#!/usr/bin/python3\n"
+        f"#!{sys.executable}\n"
         "import os, signal, sys, time\n"
         "if sys.argv[1:] == ['capabilities', '--json']:\n"
         " signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
@@ -39,7 +43,7 @@ def test_timeout_fallback(root):
     slow.chmod(0o700)
     good = good_bin / "ayre"
     good.write_text(
-        "#!/usr/bin/python3\n"
+        f"#!{sys.executable}\n"
         "import json, sys\n"
         "if sys.argv[1:] == ['capabilities', '--json']:\n"
         " print(json.dumps({'protocolVersion':1,'version':'0.2.0','capabilities':['put']}))\n"
@@ -78,7 +82,7 @@ def main():
         stdin_capture = root / "stdin.bin"
         cli = bindir / "ayre"
         cli.write_text(
-            "#!/usr/bin/python3\n"
+            f"#!{sys.executable}\n"
             "import json, os, sys\n"
             "if sys.argv[1:] == ['capabilities', '--json']:\n"
             " print(json.dumps({'protocolVersion':1,'version':'0.2.0','capabilities':['put']}))\n"
