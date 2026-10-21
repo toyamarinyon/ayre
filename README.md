@@ -54,7 +54,7 @@ The bundled executable is `Ayre.app/Contents/MacOS/ayre`:
 
 `--title` is an assertion, not metadata that changes the file: the example expects a `# Review` heading in the first 20 lines. For a heading-free body, use the slug as title. A mismatch fails with an actionable error. Registration preserves stdin UTF-8 bytes exactly, including CRLF, Unicode normalization, and trailing newlines. It does not require Accessibility, launch the app, activate a window, insert into another application, or submit anything. By default an existing slug is rejected; replacement requires `--overwrite`. Exit codes: 0 success, 2 usage/input validation, 3 existing slug, 4 storage or stdin I/O failure. Use `--store DIRECTORY` for isolated fixtures.
 
-The app release version is **0.2.1** and the Claude Code plugin version is **0.2.2**. Discovery requires CLI protocol **1** and the `put` capability, not an exact release-version match. `capabilities --json` provides `protocolVersion`, `version`, and `capabilities`. The stable app Bundle ID is `com.toyamarinyon.ayre`. This replaces the prototype's `dev.local.PromptInsertProbe`; **grant Accessibility to the new Ayre app again**. The old installation is not removed automatically.
+The app source version is **0.2.2** (build **2**, not yet published) and the Claude Code plugin version is **0.2.2**. Discovery requires CLI protocol **1** and the `put` capability, not an exact release-version match. `capabilities --json` provides `protocolVersion`, `version`, and `capabilities`. The stable app Bundle ID is `com.toyamarinyon.ayre`. This replaces the prototype's `dev.local.PromptInsertProbe`; **grant Accessibility to the new Ayre app again**. The old installation is not removed automatically.
 
 ## Build and distribution
 
@@ -73,13 +73,13 @@ Output: `build/DerivedData/Build/Products/Release/Ayre.app`. Unsigned builds are
 
 Public distribution requires Apple Developer Program membership, a Developer ID Application certificate/private key, hardened runtime, and successful notarization. Apple Development/Personal Team and ad-hoc signatures do not establish public distribution readiness. See [Apple’s Developer ID guidance](https://developer.apple.com/developer-id/) and [notarization requirements](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).
 
-Configure a notarytool Keychain profile yourself, then explicitly run:
+Configure a notarytool Keychain profile and the Sparkle keys described in [Sparkle distribution](docs/sparkle-distribution.md), then explicitly run:
 
 ```sh
 bash scripts/release.sh "Developer ID Application: Your Name (TEAM)" YOUR_NOTARY_PROFILE
 ```
 
-The script builds a universal signed app, uploads it to Apple for notarization, staples and validates its ticket, verifies Gatekeeper acceptance, then creates `build/release/Ayre-0.2.1-macOS.zip` and prints its SHA-256. It does not publish a GitHub Release. Review the artifact and evidence before uploading publicly. Never commit certificates, credentials, signing settings, build output, logs, or user prompts.
+The script builds a universal signed app, uploads it to Apple for notarization, staples and validates its ticket, verifies Gatekeeper acceptance, then creates `build/release/Ayre-0.2.2-macOS.zip` and a Sparkle `appcast.xml` containing the archive signature and prints its SHA-256. It does not publish a GitHub Release. Review the artifact and evidence before uploading publicly. Never commit certificates, credentials, signing settings, build output, logs, or user prompts.
 
 ## Development and validation
 
@@ -90,6 +90,10 @@ swift run ayre export-samples
 swift run ayre inspect --delay 5
 swift run ayre insert --sample short --delay 5 --method auto
 bash scripts/verify-lifecycle.sh
+bash scripts/verify-updater-state.sh
+bash scripts/verify-sparkle-feed.sh
+python3 scripts/test-appcast.py
+python3 scripts/test-release.py
 bash plugins/ayre/tests/test-helper.sh
 python3 scripts/verify-package.py
 claude plugin validate .
@@ -100,7 +104,7 @@ Sample export is explicit and does not overwrite existing files without `--force
 
 ### GitHub Actions signing and notarization
 
-The **Signed macOS release** workflow runs manually from `main`. It tests the project, imports a Developer ID Application identity into a temporary keychain, builds the universal app, notarizes it, staples and validates the ticket, checks Gatekeeper acceptance, and creates a **draft** GitHub Release with a ZIP and SHA-256 checksums. It never publishes the draft automatically and refuses to replace an existing release.
+The **Signed macOS release** workflow runs manually from `main`. It tests the project, imports a Developer ID Application identity into a temporary keychain, builds the universal app, notarizes it, staples and validates the ticket, checks Gatekeeper acceptance, and creates a **draft** GitHub Release with a ZIP, Sparkle appcast, and SHA-256 checksums. It never publishes the draft automatically and refuses to replace an existing release.
 
 Set these repository Actions secrets before running it:
 
@@ -110,4 +114,13 @@ Set these repository Actions secrets before running it:
 - `APPLE_TEAM_ID`: the signing certificate's Developer team.
 - `APPLE_APP_SPECIFIC_PASSWORD`: an app-specific password, not the normal account password.
 
-Use **Actions → Signed macOS release → Run workflow**, choosing `main` and tag `v0.2.1`. Only run trusted reviewed code: release workflows can access signing secrets. The hosted runner is ephemeral, and an always-run cleanup removes its temporary signing keychain. Review and download-test the draft artifact before publishing. Update the workflow version guard and archive names together when preparing a new app version.
+Use **Actions → Signed macOS release → Run workflow**, choosing `main` and tag `v0.2.2`. Only run trusted reviewed code: release workflows can access signing secrets. The hosted runner is ephemeral, and an always-run cleanup removes its temporary signing keychain. Review and download-test the draft artifact before publishing. Increase both the app marketing version and its numeric build number when preparing a new app version. Archive names and tag validation are derived from the project.
+
+
+### In-app updates
+
+Settings shows the current app version, **Check for Updates…**, and **Automatically check for updates**. Automatic checks are opt-in and persist across launches. Downloads and installation require user action in Sparkle’s standard UI; automatic installation is disabled. Scheduled checks announce available versions inside Settings without opening windows or taking focus from Spotlight. A restart requested while an App Intent is inserting waits for that insertion to finish (or time out).
+
+Users of 0.2.1 and earlier must download and install a Sparkle-enabled release once manually. App updates retain the bundle identifier, saved prompt folder, Accessibility identity, and login-item registration; macOS can still request permission confirmation after signing or location changes. Claude Code plugin updates remain separate and are never performed by the app updater.
+
+Release setup, EdDSA key handling, publication review, and troubleshooting are in [Sparkle distribution](docs/sparkle-distribution.md). A local build without a real public key displays an unavailable message and does not start the updater. Such a build is not ready for distribution.

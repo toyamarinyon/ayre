@@ -142,6 +142,7 @@ enum IntentTargetResolver {
     /// perform() returns first so Spotlight can close. Then we wait for the captured element itself to be focused again.
     @MainActor
     static func insertAfterSpotlightCloses(text: String, target: FocusTarget) {
+        IntentInsertionActivity.begin()
         let start = Date()
         func poll() {
             let pid = try? Focus.systemWideFocusedApplicationPID().get()
@@ -160,12 +161,14 @@ enum IntentTargetResolver {
                     case .success(let o): ProbeLog.log("[deferred] RESULT: write=\(axErrorName(o.writeError)) verification=\(o.verification)")
                     }
                 }
+                IntentInsertionActivity.end()
                 return
             }
             if elapsed > 5 {
                 let bid = pid.flatMap { Focus.appInfo(pid: $0).bundleID } ?? "?"
                 ProbeLog.log("[deferred] ABORT: Focus did not return to the target app within 5 seconds (current pid=\(pid.map(String.init) ?? "?") \(bid))")
                 NSSound.beep()
+                IntentInsertionActivity.end()
                 return
             }
             schedule()

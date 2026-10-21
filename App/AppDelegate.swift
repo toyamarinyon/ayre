@@ -4,7 +4,7 @@ import CoreServices
 
 @main
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @MainActor static func main() {
         let app = NSApplication.shared
         let delegate = AppDelegate()
@@ -25,9 +25,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let commandGroup = NSStackView()
     private let hotKeyCheckbox = NSButton(checkboxWithTitle: "Open the picker with ⌃⌥⌘P while Ayre is running", target: nil, action: nil)
     private let loginItemCheckbox = NSButton(checkboxWithTitle: "Start Ayre at login", target: nil, action: nil)
+    private let automaticUpdatesCheckbox = NSButton(checkboxWithTitle: "Automatically check for updates", target: nil, action: nil)
+    private let updateStatusLabel = NSTextField(wrappingLabelWithString: "")
+    private let updateCheckButton = NSButton(title: "Check for Updates…", target: nil, action: nil)
     private let hotKey = HotKey()
     private let picker = PickerController()
     private let loginItemController = LoginItemController()
+    private let updaterController = UpdaterController()
     private var statusItem: NSStatusItem?
     private var defaultLaunch: Bool?
     private var startupPresentation = StartupWindowPresentation()
@@ -47,6 +51,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ProbeLog.log("NSApplicationLaunchIsDefaultLaunchKey=\(defaultLaunch.map(String.init) ?? "unknown")")
         buildMenu()
         buildWindow()
+        updaterController.onScheduledUpdateAvailable = { [weak self] in self?.refreshUpdateSettings() }
+        updaterController.onCanCheckForUpdatesChange = { [weak self] in self?.refreshUpdateSettings() }
+        updaterController.start()
+        refreshUpdateSettings()
         refreshStatus()
         refreshLoginItemStatus()
         hotKeyCheckbox.state = .on
@@ -101,6 +109,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidBecomeActive(_ notification: Notification) {
         refreshStatus()
         refreshLoginItemStatus()
+        refreshUpdateSettings()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
@@ -120,6 +129,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotKeyCheckbox.action = #selector(toggleHotKey)
         loginItemCheckbox.target = self
         loginItemCheckbox.action = #selector(toggleLoginItem(_:))
+        automaticUpdatesCheckbox.target = self
+        automaticUpdatesCheckbox.action = #selector(toggleAutomaticUpdateChecks(_:))
+        updateCheckButton.target = self
+        updateCheckButton.action = #selector(checkForUpdates(_:))
 
         let title = NSTextField(labelWithString: "Ayre")
         title.font = .systemFont(ofSize: 24, weight: .semibold)
@@ -165,17 +178,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         """)
         help.textColor = .secondaryLabelColor
 
+        let updateHeading = sectionHeading("Software updates")
+        let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+        let versionLabel = NSTextField(labelWithString: "Current version: \(currentVersion)")
+
         let stack = NSStackView(views: [
             title, subtitle, sectionSeparator(), permissionHeading, statusLabel, permissionButtons, logButton,
             commandGroup, sectionSeparator(), loginHeading, loginGroup,
             sectionSeparator(), promptsHeading, storeLabel, storeButtons,
+            sectionSeparator(), updateHeading, versionLabel, updateStatusLabel, updateCheckButton, automaticUpdatesCheckbox,
             sectionSeparator(), hotkeyHeading, hotKeyCheckbox, help,
         ])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 10
         stack.edgeInsets = NSEdgeInsets(top: 18, left: 20, bottom: 18, right: 20)
-        [subtitle, statusLabel, storeLabel, loginStatusLabel, help, installCommandsLabel].forEach {
+        [subtitle, statusLabel, storeLabel, loginStatusLabel, help, installCommandsLabel, updateStatusLabel].forEach {
             $0.preferredMaxLayoutWidth = 640
         }
         let scrollView = NSScrollView(frame: window.contentView?.bounds ?? .zero)
@@ -249,6 +267,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appMenu.addItem(withTitle: "Settings…", action: #selector(showWindow), keyEquivalent: ",")
         appMenu.items.last?.target = self
         appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates(_:)), keyEquivalent: "")
+        appMenu.items.last?.target = self
+        appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Quit Ayre", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         NSApp.mainMenu = menu
@@ -284,6 +305,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         loginItemCheckbox.state = snapshot.isToggleOn ? .on : .off
         loginStatusLabel.stringValue = snapshot.summary
         ProbeLog.log("SMAppService.mainApp.status=\(snapshot.status)")
+    }
+
+    private func refreshUpdateSettings() {
+        let available = updaterController.updater != nil
+        if let configurationError = updaterController.configurationError {
+            updateStatusLabel.stringValue = configurationError
+        } else if let version = updaterController.scheduledUpdateAvailable {
+            updateStatusLabel.stringValue = "Version \(version) is available. Choose Check for Updates… to review it."
+        } else {
+            updateStatusLabel.stringValue = ""
+        }
+        updateStatusLabel.textColor = .secondaryLabelColor
+        updateCheckButton.isEnabled = available && updaterController.canCheckForUpdates
+        automaticUpdatesCheckbox.isEnabled = available
+        automaticUpdatesCheckbox.state = updaterController.automaticallyChecksForUpdates() ? .on : .off
+    }
+
+    @objc private func toggleAutomaticUpdateChecks(_ sender: NSButton) {
+        updaterController.setAutomaticChecksEnabled(sender.state == .on)
+        refreshUpdateSettings()
+    }
+
+    @objc private func checkForUpdates(_ sender: Any?) {
+        guard updaterController.canCheckForUpdates else {
+            refreshUpdateSettings()
+            return
+        }
+        updaterController.checkForUpdates(sender)
+    }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        guard menuItem.action == #selector(checkForUpdates(_:)) else { return true }
+        return updaterController.updater != nil && updaterController.canCheckForUpdates
     }
 
     @objc private func requestPermission() {
