@@ -38,7 +38,7 @@ case "$mode" in
     fi
     team="${identity##*(}"
     team="${team%)}"
-    xcode_args+=(CODE_SIGNING_ALLOWED=YES CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="$team" CODE_SIGN_IDENTITY="$identity")
+    xcode_args+=(CODE_SIGNING_ALLOWED=YES CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="$team" CODE_SIGN_IDENTITY="$identity" CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO)
     ;;
 esac
 xcodebuild -project PromptInsertProbe.xcodeproj -scheme PromptInsertProbe -configuration "$configuration" \
