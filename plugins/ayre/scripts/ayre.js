@@ -57,7 +57,7 @@ function launchServicesApplications() {
     return result;
 }
 
-function resolve(cliCandidates, applications, lookup) {
+function resolve(cliCandidates, applications, lookup, preferredApplications) {
     var seenCli = {};
     for (var i = 0; i < cliCandidates.length; i++) {
         var candidate = cliCandidates[i];
@@ -66,6 +66,20 @@ function resolve(cliCandidates, applications, lookup) {
         if (lookup.compatible(candidate)) return candidate;
     }
 
+    var preferred = preferredApplications || [];
+    for (var p = 0; p < preferred.length; p++) {
+        var installed = lookup.canonical(preferred[p]);
+        if (!lookup.exists(installed) || lookup.bundleIdentifier(installed) !== BUNDLE_ID) continue;
+        var installedCLI = installed + "/Contents/MacOS/ayre";
+        if (!lookup.executable(installedCLI) || !lookup.compatible(installedCLI)) {
+            error(preferred[p] + " is installed but its ayre CLI is missing or incompatible. " +
+                "Update Ayre, or put a compatible ayre CLI on PATH.");
+        }
+        return installedCLI;
+    }
+
+    // Query Launch Services only after PATH and the preferred installations fail to match.
+    if (typeof applications === "function") applications = applications();
     var valid = [];
     var stale = [];
     var seenApps = {};
@@ -183,7 +197,14 @@ function probeCompatible(path) {
     return capabilitiesFor(path) !== null;
 }
 
-function resolveAyre(cliCandidates, applications, compatible) {
+function preferredApplications() {
+    var homeValue = $.NSProcessInfo.processInfo.environment.objectForKey("HOME");
+    var home = homeValue ? text(homeValue) : text($.NSHomeDirectory());
+    if (!home) home = text($.NSHomeDirectory());
+    return ["/Applications/Ayre.app", home.replace(/\/+$/, "") + "/Applications/Ayre.app"];
+}
+
+function resolveAyre(cliCandidates, applications, compatible, preferred) {
     return resolve(cliCandidates, applications, {
         canonical: function (path) {
             return text($.NSURL.fileURLWithPath(path).URLByStandardizingPath.URLByResolvingSymlinksInPath.path);
@@ -192,7 +213,7 @@ function resolveAyre(cliCandidates, applications, compatible) {
         executable: executable,
         bundleIdentifier: bundleIdentifier,
         compatible: compatible
-    });
+    }, preferred === undefined ? preferredApplications() : preferred);
 }
 
 function makeDirectory(path) {
@@ -306,8 +327,9 @@ function put(directory, injected) {
     }
 
     var candidates = injected ? injected.cliCandidates : pathCandidates();
-    var apps = injected ? injected.applications : launchServicesApplications();
-    var cli = resolveAyre(candidates, apps, injected ? injected.compatible : probeCompatible);
+    var apps = injected ? injected.applications : launchServicesApplications;
+    var cli = resolveAyre(candidates, apps, injected ? injected.compatible : probeCompatible,
+        injected ? injected.preferredApplications : undefined);
     runAyre(cli, request, promptPath);
     cleanupTempDirectory(directory);
 }
@@ -384,6 +406,69 @@ function runSelfTests() {
         }
         if (!ambiguous) error("Self-test failed: multiple compatible matches were not reported clearly.");
 
+        var systemApp = base + "/Applications/Ayre.app";
+        var userApp = base + "/home/Applications/Ayre.app";
+        var systemCLI = systemApp + "/Contents/MacOS/ayre";
+        var userCLI = userApp + "/Contents/MacOS/ayre";
+        var installedApps = [systemApp, userApp];
+        bundleIDs[systemApp] = BUNDLE_ID;
+        bundleIDs[userApp] = BUNDLE_ID;
+        executablePaths[systemCLI] = executablePaths[userCLI] = true;
+        compatiblePaths[systemCLI] = compatiblePaths[userCLI] = true;
+        var noLaunchServices = function () {
+            error("Self-test failed: Launch Services was queried before installed app resolution.");
+        };
+        if (resolve([pathCLI], noLaunchServices, lookup, installedApps) !== pathCLI) {
+            error("Self-test failed: PATH did not override installed Ayre.");
+        }
+        if (resolve([], [appOne, appTwo], lookup, installedApps) !== systemCLI ||
+            resolve([], noLaunchServices, lookup, installedApps) !== systemCLI) {
+            error("Self-test failed: system Ayre did not override user Ayre and registered copies.");
+        }
+        delete bundleIDs[systemApp];
+        if (resolve([], noLaunchServices, lookup, installedApps) !== userCLI) {
+            error("Self-test failed: user Ayre was not selected when system Ayre was absent.");
+        }
+        bundleIDs[systemApp] = "another.bundle";
+        if (resolve([], noLaunchServices, lookup, installedApps) !== userCLI) {
+            error("Self-test failed: unrelated system app was not skipped.");
+        }
+        bundleIDs[systemApp] = BUNDLE_ID;
+        function expectInstalledError() {
+            var failed = false;
+            try {
+                resolve([], noLaunchServices, lookup, installedApps);
+            } catch (e) {
+                failed = String(e).indexOf(systemApp) !== -1 &&
+                    String(e).indexOf("Update Ayre") !== -1;
+            }
+            if (!failed) error("Self-test failed: broken installed Ayre did not stop resolution.");
+        }
+        compatiblePaths[systemCLI] = false;
+        expectInstalledError();
+        compatiblePaths[systemCLI] = true;
+        executablePaths[systemCLI] = false;
+        expectInstalledError();
+        delete bundleIDs[systemApp];
+        delete bundleIDs[userApp];
+        if (resolve([], [appOne], lookup, installedApps) !== appOne + "/Contents/MacOS/ayre") {
+            error("Self-test failed: Launch Services fallback was not selected.");
+        }
+        var fallbackAmbiguous = false;
+        try {
+            resolve([], [appOne, appTwo], lookup, installedApps);
+        } catch (e) {
+            fallbackAmbiguous = String(e).indexOf("Multiple compatible Ayre applications") !== -1;
+        }
+        if (!fallbackAmbiguous) error("Self-test failed: ambiguous fallback was not rejected.");
+        var staleOnly = false;
+        try {
+            resolve([], [base + "/stale Ayre.app"], lookup, installedApps);
+        } catch (e) {
+            staleOnly = String(e).indexOf("missing or stale") !== -1;
+        }
+        if (!staleOnly) error("Self-test failed: stale-only fallback was not rejected.");
+
         var fakeBin = createTestDirectory(base, "fake CLI bin with spaces");
         var fakeCLI = fakeBin + "/ayre";
         var captured = base + "/captured stdin bytes";
@@ -423,6 +508,7 @@ function runSelfTests() {
         put(requestDir, {
             cliCandidates: [fakeCLI],
             applications: [],
+            preferredApplications: [],
             compatible: probeCompatible
         });
 
@@ -459,7 +545,7 @@ function main() {
         return;
     }
     if (args.length === 1 && args[0] === "resolve") {
-        var path = resolveAyre(pathCandidates(), launchServicesApplications(), probeCompatible);
+        var path = resolveAyre(pathCandidates(), launchServicesApplications, probeCompatible);
         var capabilities = capabilitiesFor(path);
         if (!capabilities) error("Selected Ayre CLI stopped responding during the final compatibility check.");
         writeStdout(JSON.stringify({

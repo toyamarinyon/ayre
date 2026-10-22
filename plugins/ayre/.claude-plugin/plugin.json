@@ -1,7 +1,7 @@
 {
   "name": "ayre",
-  "description": "Save reusable prompts and prepare self-contained Codex implementation handoffs with Ayre.",
-  "version": "0.2.2",
+  "description": "Prepare and save self-contained Codex implementation handoffs with Ayre.",
+  "version": "0.2.3",
   "author": {
     "name": "Toyama Rinyon",
     "url": "https://github.com/toyamarinyon"

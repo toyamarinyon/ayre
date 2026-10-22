@@ -50,7 +50,7 @@ Before saving, check the prompt as if Codex has only this text and the authorize
 
 ## Save with the shared Ayre helper
 
-Use the existing plugin helper directly; do not require a fixed application location, PATH changes, or another installed skill.
+Use the existing plugin helper directly; do not require a fixed application location, PATH changes, or another installed skill. The helper searches in this order: compatible CLI on PATH, `/Applications/Ayre.app`, `~/Applications/Ayre.app` (using `HOME`, or `NSHomeDirectory()` when `HOME` is unavailable), then Launch Services. The conventional app paths are preferred locations, not required install locations. If a preferred path exists and has Bundle ID `com.toyamarinyon.ayre`, it is selected; a missing or incompatible bundled CLI is an error and does not trigger fallback to another app or Launch Services.
 
 1. Choose a lowercase ASCII slug such as `handoff-codex-<task>`, obeying Ayre's slug rules. Set `title` to the first nonempty `# ` heading in the first 20 lines. Keep the goal as the first line; do not prepend the title above it.
 2. Run:

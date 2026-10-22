@@ -1,6 +1,6 @@
 {
   "name": "ayre",
-  "description": "Claude Code skills for reusable prompts and self-contained Codex handoffs with Ayre.",
+  "description": "A Claude Code skill for self-contained Codex handoffs with Ayre.",
   "owner": {
     "name": "Toyama Rinyon",
     "url": "https://github.com/toyamarinyon"
@@ -9,7 +9,7 @@
     {
       "name": "ayre",
       "source": "./plugins/ayre",
-      "description": "Save reusable prompts or prepare a self-contained Codex handoff, then insert it with Ayre Go."
+      "description": "Prepare and save a self-contained Codex handoff, then insert it with Ayre Go."
     }
   ]
 }
