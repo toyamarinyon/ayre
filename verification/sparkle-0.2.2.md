@@ -1,6 +1,8 @@
 # Sparkle implementation evidence — 0.2.2 (build 2)
 
-Status: implemented locally, not published. Existing unrelated README/handoff-codex skill edits were preserved. No installed app, production signing key, saved prompt data, GitHub secret, or release was changed by this work.
+Initial local verification snapshot. Subsequent signed CI and downloaded-artifact results are recorded in [signed release evidence](sparkle-distribution-run.md), and actual fixture installation/relaunch in [install fixture evidence](sparkle-install-fixture.md). The limitations below describe this earlier local snapshot.
+
+Status at that snapshot: implemented locally, not published. Existing unrelated README/handoff-codex skill edits were preserved. No installed app, production signing key, saved prompt data, GitHub secret, or release was changed by this work.
 
 ## Verified
 
