@@ -6,7 +6,6 @@ import plistlib
 import base64
 import os
 import re
-import shutil
 import subprocess
 import tempfile
 import unittest
@@ -34,6 +33,50 @@ def ephemeral_keypair(directory: pathlib.Path):
     key_file.write_text(seed + "\n")
     key_file.chmod(0o600)
     return seed, public_key, key_file
+
+
+def sign_fixture_app(app: pathlib.Path) -> None:
+    """Seal a disposable fixture while preserving valid nested signatures."""
+    # Local unsigned builds contain linker signatures and an unsealed Sparkle
+    # framework. Repair only invalid signatures in the disposable copy; keep
+    # valid Xcode/Developer ID signatures (especially Sparkle's helpers) intact.
+    for executable in sorted((app / "Contents/MacOS").iterdir(), key=lambda path: len(path.name)):
+        if executable.is_file():
+            file_type = subprocess.run(
+                ["file", "-b", str(executable)], text=True, capture_output=True, check=True,
+            ).stdout
+            if "Mach-O" in file_type and subprocess.run(
+                ["codesign", "--verify", "--strict", str(executable)],
+                text=True, capture_output=True,
+            ).returncode != 0:
+                nested = subprocess.run(
+                    ["codesign", "--force", "--sign", "-", "--timestamp=none", str(executable)],
+                    text=True, capture_output=True,
+                )
+                if nested.returncode != 0:
+                    raise AssertionError("Could not ad-hoc sign fixture executable: " + nested.stdout + nested.stderr)
+    framework = app / "Contents/Frameworks/Sparkle.framework"
+    if framework.exists() and subprocess.run(
+        ["codesign", "--verify", "--strict", str(framework)], text=True, capture_output=True,
+    ).returncode != 0:
+        nested_framework = subprocess.run(
+            ["codesign", "--force", "--sign", "-", "--timestamp=none", str(framework)],
+            text=True, capture_output=True,
+        )
+        if nested_framework.returncode != 0:
+            raise AssertionError("Could not ad-hoc sign fixture framework: " + nested_framework.stdout + nested_framework.stderr)
+    signed = subprocess.run(
+        ["codesign", "--force", "--sign", "-", "--timestamp=none", str(app)],
+        text=True, capture_output=True,
+    )
+    if signed.returncode != 0:
+        raise AssertionError("Could not ad-hoc sign disposable app fixture: " + signed.stdout + signed.stderr)
+    verified = subprocess.run(
+        ["codesign", "--verify", "--deep", "--strict", "--verbose=2", str(app)],
+        text=True, capture_output=True,
+    )
+    if verified.returncode != 0:
+        raise AssertionError("Disposable app fixture signature is invalid: " + verified.stdout + verified.stderr)
 
 
 class AppcastTests(unittest.TestCase):
@@ -153,11 +196,13 @@ sparkle:edSignature="{signature}" length="{length}" type="application/octet-stre
         ))
         if not source_app.is_dir():
             self.skipTest("Build Ayre.app before testing generated appcast output")
+        # CI's source app is Developer ID signed. Local builds are unsigned, so
+        # first create a valid ad-hoc-signed stand-in, then mutate only copies.
+        signed_source_app = self.root / "SignedSource.app"
+        subprocess.run(["ditto", str(source_app), str(signed_source_app)], check=True)
+        sign_fixture_app(signed_source_app)
         app = self.root / "Ayre.app"
-        subprocess.run(["ditto", str(source_app), str(app)], check=True)
-        app_signature = app / "Contents/_CodeSignature"
-        if app_signature.exists():
-            shutil.rmtree(app_signature)
+        subprocess.run(["ditto", str(signed_source_app), str(app)], check=True)
         info_path = app / "Contents/Info.plist"
         with info_path.open("rb") as file:
             info = plistlib.load(file)
@@ -165,6 +210,7 @@ sparkle:edSignature="{signature}" length="{length}" type="application/octet-stre
         info["SUFeedURL"] = verify_appcast.APPCAST_URL
         with info_path.open("wb") as file:
             plistlib.dump(info, file)
+        sign_fixture_app(app)
         marketing_version = info["CFBundleShortVersionString"]
         bundle_version = info["CFBundleVersion"]
         tag = f"v{marketing_version}"
@@ -216,6 +262,7 @@ sparkle:edSignature="{signature}" length="{length}" type="application/octet-stre
         mismatched_info["SUPublicEDKey"] = wrong_public_key
         with mismatched_info_path.open("wb") as file:
             plistlib.dump(mismatched_info, file)
+        sign_fixture_app(mismatched_app)
         mismatched_updates = self.root / "mismatched-updates"
         mismatched_updates.mkdir()
         mismatched_archive = mismatched_updates / archive.name
