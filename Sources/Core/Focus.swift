@@ -37,6 +37,117 @@ public struct FocusTarget {
 }
 
 public enum Focus {
+    /// Lightweight observation for background monitoring; no enabling requests or content reads.
+    public static func monitorSnapshot() -> String {
+        guard AXIsProcessTrusted() else { return "trusted=false" }
+        guard let front = NSWorkspace.shared.frontmostApplication else { return "trusted=true frontmost=nil" }
+        let pid = front.processIdentifier
+        let bundle = front.bundleURL.flatMap { Bundle(url: $0) }
+        let system = AXUIElementCreateSystemWide()
+        let app = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(system, 0.1)
+        AXUIElementSetMessagingTimeout(app, 0.1)
+        func describe(_ owner: AXUIElement, _ attr: String) -> String {
+            let (error, element) = AX.element(owner, attr)
+            guard let element else { return axErrorName(error) }
+            AXUIElementSetMessagingTimeout(element, 0.1)
+            return "\(axErrorName(error)):pid=\(AX.pid(element) ?? -1):role=\(AX.string(element, kAXRoleAttribute) ?? "?")"
+        }
+        return "trusted=true frontmost=\(front.bundleIdentifier ?? "?") pid=\(pid) path=\(front.bundleURL?.path ?? "?") version=\(bundle?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?") build=\(bundle?.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?") systemApp=\(describe(system, kAXFocusedApplicationAttribute)) systemElement=\(describe(system, kAXFocusedUIElementAttribute)) appElement=\(describe(app, kAXFocusedUIElementAttribute)) window=\(describe(app, kAXFocusedWindowAttribute))"
+    }
+
+    /// Bounded, read-only tree inventory. Never inspect values, labels, titles, or selections.
+    @MainActor
+    public static func logWindowTreeDiagnostic(pid: pid_t, id: String) {
+        let prefix = "[focus-tree \(id)]"
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == pid, pid != getpid() else {
+            AyreLog.log("\(prefix) skipped: original app is no longer frontmost")
+            return
+        }
+        let running = NSRunningApplication(processIdentifier: pid)
+        let bundle = running?.bundleURL.flatMap { Bundle(url: $0) }
+        AyreLog.log("\(prefix) pid=\(pid) bundle=\(running?.bundleIdentifier ?? "?") version=\(bundle?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?") build=\(bundle?.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?")")
+        let app = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(app, 0.05)
+        let (error, window) = AX.element(app, kAXFocusedWindowAttribute)
+        guard let window else {
+            AyreLog.log("\(prefix) no focused window: \(axErrorName(error))")
+            return
+        }
+        let start = Date()
+        var queue: [(AXUIElement, Int)] = [(window, 0)]
+        var visited: [AXUIElement] = []
+        var index = 0
+        var textCount = 0
+        var truncated = false
+        while index < queue.count, index < 150, Date().timeIntervalSince(start) < 1.5 {
+            let (element, depth) = queue[index]
+            index += 1
+            guard !visited.contains(where: { CFEqual($0, element) }) else { continue }
+            visited.append(element)
+            AXUIElementSetMessagingTimeout(element, 0.05)
+            let role = AX.string(element, kAXRoleAttribute) ?? "?"
+            let focused = AX.bool(element, kAXFocusedAttribute).map(String.init) ?? "?"
+            let secure = AX.string(element, kAXSubroleAttribute) == kAXSecureTextFieldSubrole as String
+            let isText = textRoles.contains(role)
+            if isText { textCount += 1 }
+            var detail = ""
+            if isText && !secure {
+                let (setError, settable) = AX.isSettable(element, kAXSelectedTextAttribute)
+                detail = " selectedTextSettable=\(settable) error=\(axErrorName(setError))"
+            }
+            AyreLog.log("\(prefix) node=\(index) depth=\(depth) role=\(role) focused=\(focused) secure=\(secure)\(detail)")
+            if secure { continue }
+            var count: CFIndex = 0
+            let countError = AXUIElementGetAttributeValueCount(element, kAXChildrenAttribute as CFString, &count)
+            guard countError == .success else {
+                AyreLog.log("\(prefix) node=\(index) children error=\(axErrorName(countError))")
+                continue
+            }
+            guard count > 0 else { continue }
+            guard depth < 16, queue.count < 150 else { truncated = true; continue }
+            let take = min(count, 150 - queue.count)
+            var raw: CFArray?
+            let childError = AXUIElementCopyAttributeValues(element, kAXChildrenAttribute as CFString, 0, take, &raw)
+            if childError == .success, let children = raw as? [AXUIElement] {
+                queue.append(contentsOf: children.map { ($0, depth + 1) })
+            } else {
+                AyreLog.log("\(prefix) node=\(index) children read error=\(axErrorName(childError))")
+            }
+            if take < count { truncated = true }
+        }
+        AyreLog.log("\(prefix) finished nodes=\(visited.count) textRoles=\(textCount) truncated=\(truncated || index < queue.count) elapsed=\(String(format: "%.2f", Date().timeIntervalSince(start)))s")
+    }
+
+    /// Read-only snapshot: never read field contents, labels, or window titles.
+    @MainActor
+    public static func logDiagnostic(id: String, originalPID: pid_t?) {
+        let system = AXUIElementCreateSystemWide()
+        AXUIElementSetMessagingTimeout(system, 0.3)
+        let front = NSWorkspace.shared.frontmostApplication
+        let prefix = "[focus-diagnostic \(id)]"
+        AyreLog.log("\(prefix) trusted=\(AXIsProcessTrusted()) frontmost=\(front?.bundleIdentifier ?? "?") pid=\(front?.processIdentifier ?? -1)")
+        func read(_ owner: AXUIElement, _ attribute: String, source: String) -> AXUIElement? {
+            let (error, element) = AX.element(owner, attribute)
+            let pid = element.flatMap { AX.pid($0) }
+            let role = element.flatMap { AX.string($0, kAXRoleAttribute) } ?? "-"
+            AyreLog.log("\(prefix) \(source).\(attribute) error=\(axErrorName(error)) pid=\(pid.map(String.init) ?? "-") role=\(role)")
+            return element
+        }
+        let focusedApp = read(system, kAXFocusedApplicationAttribute, source: "system")
+        _ = read(system, kAXFocusedUIElementAttribute, source: "system")
+        let pids = Set([originalPID, front?.processIdentifier, focusedApp.flatMap { AX.pid($0) }].compactMap { $0 })
+        for pid in pids.sorted() where pid != getpid() {
+            let app = AXUIElementCreateApplication(pid)
+            AXUIElementSetMessagingTimeout(app, 0.3)
+            AyreLog.log("\(prefix) app pid=\(pid) bundle=\(appInfo(pid: pid).bundleID ?? "?")")
+            _ = read(app, kAXFocusedUIElementAttribute, source: "app(\(pid))")
+            if let window = read(app, kAXFocusedWindowAttribute, source: "app(\(pid))") {
+                _ = read(window, kAXFocusedUIElementAttribute, source: "window(\(pid))")
+            }
+        }
+    }
+
     public static let textRoles: Set<String> = [
         kAXTextAreaRole as String, kAXTextFieldRole as String, kAXComboBoxRole as String,
     ]

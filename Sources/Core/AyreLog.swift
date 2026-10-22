@@ -10,6 +10,27 @@ public enum AyreLog {
     }()
 
     public static var echoToStderr = true
+    public static var focusMonitorURL: URL { logURL.deletingLastPathComponent().appendingPathComponent("focus-monitor.log") }
+
+    /// Keep the current and previous file, each at most approximately 1 MiB.
+    public static func monitor(_ message: String) {
+        queue.sync {
+            let url = focusMonitorURL
+            let fm = FileManager.default
+            let size = (try? fm.attributesOfItem(atPath: url.path)[.size] as? NSNumber)?.intValue ?? 0
+            if size >= 1_048_576 {
+                let previous = url.appendingPathExtension("previous")
+                try? fm.removeItem(at: previous)
+                try? fm.moveItem(at: url, to: previous)
+            }
+            let data = Data("\(formatter.string(from: Date())) \(message)\n".utf8)
+            if let handle = try? FileHandle(forWritingTo: url) {
+                handle.seekToEndOfFile()
+                handle.write(data)
+                try? handle.close()
+            } else { try? data.write(to: url) }
+        }
+    }
     private static let queue = DispatchQueue(label: "Ayre.log")
     private static let formatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()

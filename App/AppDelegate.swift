@@ -2,6 +2,56 @@ import AppKit
 import ApplicationServices
 import CoreServices
 
+/// One serial worker prevents overlapping AX queries and keeps them off the UI thread.
+final class FocusMonitor {
+    private let queue = DispatchQueue(label: "Ayre.focus-monitor", qos: .utility)
+    private let stateLock = NSLock()
+    private var enabled = false
+    private var timer: DispatchSourceTimer?
+
+    func setEnabled(_ enabled: Bool) {
+        stateLock.lock()
+        self.enabled = enabled
+        stateLock.unlock()
+        timer?.cancel()
+        timer = nil
+        guard enabled else {
+            // Drain any in-flight or already-enqueued tick before returning to the UI.
+            queue.sync {}
+            AyreLog.monitor("monitor disabled")
+            return
+        }
+        AyreLog.monitor("monitor enabled interval=5s change-only with 60s heartbeat")
+        let source = DispatchSource.makeTimerSource(queue: queue)
+        var last: String?
+        var lastWritten = Date.distantPast
+        source.schedule(deadline: .now(), repeating: 5, leeway: .seconds(1))
+        source.setEventHandler { [weak self] in
+            guard let self else { return }
+            self.stateLock.lock()
+            let shouldRun = self.enabled
+            self.stateLock.unlock()
+            guard shouldRun else { return }
+            autoreleasepool {
+                let snapshot = Focus.monitorSnapshot()
+                self.stateLock.lock()
+                let shouldLog = self.enabled
+                self.stateLock.unlock()
+                guard shouldLog else { return }
+                if snapshot != last || Date().timeIntervalSince(lastWritten) >= 60 {
+                    AyreLog.monitor(snapshot)
+                    last = snapshot
+                    lastWritten = Date()
+                }
+            }
+        }
+        timer = source
+        source.resume()
+    }
+
+    deinit { timer?.cancel() }
+}
+
 @main
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
@@ -23,6 +73,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /plugin install ayre@ayre
     """)
     private let commandGroup = NSStackView()
+    private let focusMonitor = FocusMonitor()
+    private let focusMonitorCheckbox = NSButton(checkboxWithTitle: "Record background focus diagnostics", target: nil, action: nil)
     private let loginItemCheckbox = NSButton(checkboxWithTitle: "Start Ayre at login", target: nil, action: nil)
     private let automaticUpdatesCheckbox = NSButton(checkboxWithTitle: "Automatically check for updates", target: nil, action: nil)
     private let updateStatusLabel = NSTextField(wrappingLabelWithString: "")
@@ -49,6 +101,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         AyreLog.log("NSApplicationLaunchIsDefaultLaunchKey=\(defaultLaunch.map(String.init) ?? "unknown")")
         buildMenu()
         buildWindow()
+        let monitoring = UserDefaults.standard.object(forKey: "focusMonitoringEnabled") as? Bool ?? false
+        focusMonitorCheckbox.state = monitoring ? .on : .off
+        focusMonitor.setEnabled(monitoring)
         updaterController.onScheduledUpdateAvailable = { [weak self] in self?.refreshUpdateSettings() }
         updaterController.onCanCheckForUpdatesChange = { [weak self] in self?.refreshUpdateSettings() }
         updaterController.start()
@@ -140,6 +195,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             makeButton("Check Again", action: #selector(refreshStatus)),
         ])
         let logButton = makeButton("Open Diagnostic Log", action: #selector(openLog))
+        focusMonitorCheckbox.target = self
+        focusMonitorCheckbox.action = #selector(toggleFocusMonitor)
+        let monitorHelp = NSTextField(wrappingLabelWithString: "Off by default. Enable while troubleshooting, then turn off when finished. Records app paths, versions, focus roles and API errors every 5 seconds when they change. No field content. Keeps two files of about 1 MB each. Your choice is saved across launches.")
+        monitorHelp.preferredMaxLayoutWidth = 640
+        monitorHelp.textColor = .secondaryLabelColor
+        let monitorButtons = horizontalStack([
+            makeButton("Mark Problem Now", action: #selector(markFocusProblem)),
+            makeButton("Open Focus History", action: #selector(openFocusHistory)),
+        ])
 
         installCommandsLabel.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
         installCommandsLabel.textColor = .labelColor
@@ -174,6 +238,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             commandGroup, sectionSeparator(), loginHeading, loginGroup,
             sectionSeparator(), promptsHeading, storeLabel, storeButtons,
             sectionSeparator(), updateHeading, versionLabel, updateStatusLabel, updateCheckButton, automaticUpdatesCheckbox,
+            sectionSeparator(), sectionHeading("Focus diagnostics"), focusMonitorCheckbox, monitorHelp, monitorButtons,
         ])
         stack.orientation = .vertical
         stack.alignment = .leading
@@ -350,6 +415,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     @objc private func openLog() { NSWorkspace.shared.open(AyreLog.logURL) }
+
+    @objc private func toggleFocusMonitor() {
+        let enabled = focusMonitorCheckbox.state == .on
+        UserDefaults.standard.set(enabled, forKey: "focusMonitoringEnabled")
+        focusMonitor.setEnabled(enabled)
+    }
+
+    @objc private func markFocusProblem() {
+        AyreLog.monitor("USER MARK: problem reported; inspect preceding focus history and ayre.log at this timestamp")
+        AyreLog.log("USER MARK: focus problem reported")
+    }
+
+    @objc private func openFocusHistory() { NSWorkspace.shared.open(AyreLog.focusMonitorURL) }
 
     @objc private func openStore() {
         try? FileManager.default.createDirectory(at: store.directory, withIntermediateDirectories: true)

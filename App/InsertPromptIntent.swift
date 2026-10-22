@@ -110,9 +110,12 @@ enum IntentTargetResolver {
         AyreLog.log("[perform] NSWorkspace.frontmost=\(front?.bundleIdentifier ?? "?") pid=\(front?.processIdentifier ?? -1)")
 
         var candidates: [FocusTarget] = []
-        if case .success(let t) = Focus.captureFocusedTarget(enableElectronAX: true, retry: 0.3) {
+        switch Focus.captureFocusedTarget(enableElectronAX: true, retry: 0.3) {
+        case .success(let t):
             AyreLog.log("[perform] AX focused: \(t.summary)")
             candidates.append(t)
+        case .failure(let error):
+            AyreLog.log("[perform] AX capture failed: \(error)")
         }
         if let front, front.processIdentifier != getpid(), !invokerBundleIDs.contains(front.bundleIdentifier ?? "") {
             Focus.enableManualAccessibility(pid: front.processIdentifier)
@@ -132,11 +135,34 @@ enum IntentTargetResolver {
                 AyreLog.log("[perform] reject \(t.source): \(e)")
                 continue
             }
+            Focus.logDiagnostic(id: "resolved", originalPID: t.pid)
             Focus.logReport(t)
             return t
         }
         AyreLog.log("[perform] ABORT: Cannot identify the original text field")
+        diagnoseAfterFailure(originalPID: front?.processIdentifier)
         throw IntentFailure(reason: "Cannot identify the original text field; focus may still be on Spotlight. Check the log.")
+    }
+
+    /// Observe after returning the failure as well as immediately. No retries of insertion,
+    /// activation, AX writes, or new target selection are performed by this diagnostic.
+    @MainActor
+    private static func diagnoseAfterFailure(originalPID: pid_t?) {
+        let id = UUID().uuidString
+        let start = Date()
+        IntentInsertionActivity.begin()
+        Task { @MainActor in
+            defer { IntentInsertionActivity.end() }
+            for delay: UInt64 in [0, 200_000_000, 600_000_000, 1_200_000_000] {
+                do { try await Task.sleep(nanoseconds: delay) }
+                catch { return }
+                let elapsed = String(format: "%.2f", Date().timeIntervalSince(start))
+                Focus.logDiagnostic(id: "\(id) +\(elapsed)s", originalPID: originalPID)
+            }
+            if let originalPID {
+                Focus.logWindowTreeDiagnostic(pid: originalPID, id: id)
+            }
+        }
     }
 
     /// perform() returns first so Spotlight can close. Then we wait for the captured element itself to be focused again.
