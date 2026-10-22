@@ -35,6 +35,10 @@ build_version = info["CFBundleVersion"]
 numeric_version(marketing_version, "CFBundleShortVersionString")
 numeric_version(build_version, "CFBundleVersion")
 assert info["LSUIElement"] is True
+icon_name = info.get("CFBundleIconFile", "")
+assert icon_name, "App bundle must declare its application icon"
+icon_file = icon_name if icon_name.endswith(".icns") else icon_name + ".icns"
+assert (app / "Contents/Resources" / icon_file).is_file(), "Declared application icon must be bundled"
 assert info.get("SUFeedURL") == "https://github.com/toyamarinyon/ayre/releases/latest/download/appcast.xml"
 assert info.get("SUEnableAutomaticChecks") is False
 assert info.get("SUAutomaticallyUpdate") is False

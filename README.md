@@ -54,7 +54,7 @@ The bundled executable is `Ayre.app/Contents/MacOS/ayre`:
 
 `--title` is an assertion, not metadata that changes the file: the example expects a `# Review` heading in the first 20 lines. For a heading-free body, use the slug as title. A mismatch fails with an actionable error. Registration preserves stdin UTF-8 bytes exactly, including CRLF, Unicode normalization, and trailing newlines. It does not require Accessibility, launch the app, activate a window, insert into another application, or submit anything. By default an existing slug is rejected; replacement requires `--overwrite`. Exit codes: 0 success, 2 usage/input validation, 3 existing slug, 4 storage or stdin I/O failure. Use `--store DIRECTORY` for isolated fixtures.
 
-The app source version is **0.3.1** (build **4**) and the Claude Code plugin version is **0.2.3**. Discovery requires CLI protocol **1** and the `put` capability, not an exact release-version match. `capabilities --json` provides `protocolVersion`, `version`, and `capabilities`. The app Bundle ID is `com.toyamarinyon.ayre`. Grant Accessibility permission to Ayre in System Settings.
+The app source version is **0.3.2** (build **5**) and the Claude Code plugin version is **0.2.3**. Discovery requires CLI protocol **1** and the `put` capability, not an exact release-version match. `capabilities --json` provides `protocolVersion`, `version`, and `capabilities`. The app Bundle ID is `com.toyamarinyon.ayre`. Grant Accessibility permission to Ayre in System Settings.
 
 ## Build and distribution
 
@@ -79,7 +79,7 @@ Configure a notarytool Keychain profile and the Sparkle keys described in [Spark
 bash scripts/release.sh "Developer ID Application: Your Name (TEAM)" YOUR_NOTARY_PROFILE
 ```
 
-The script builds a universal signed app, uploads it to Apple for notarization, staples and validates its ticket, verifies Gatekeeper acceptance, then creates `build/release/Ayre-0.3.1-macOS.zip` and a Sparkle `appcast.xml` containing the archive signature and prints its SHA-256. It does not publish a GitHub Release. Review the artifact and evidence before uploading publicly. Never commit certificates, credentials, signing settings, build output, logs, or user prompts.
+The script builds a universal signed app, uploads it to Apple for notarization, staples and validates its ticket, verifies Gatekeeper acceptance, then creates `build/release/Ayre-0.3.2-macOS.zip` and a Sparkle `appcast.xml` containing the archive signature and prints its SHA-256. It does not publish a GitHub Release. Review the artifact and evidence before uploading publicly. Never commit certificates, credentials, signing settings, build output, logs, or user prompts.
 
 ## Development and validation
 
@@ -115,7 +115,7 @@ Set these repository Actions secrets before running it:
 - `APPLE_TEAM_ID`: the signing certificate's Developer team.
 - `APPLE_APP_SPECIFIC_PASSWORD`: an app-specific password, not the normal account password.
 
-Use **Actions → Signed macOS release → Run workflow**, choosing `main` and tag `v0.3.1`. Only run trusted reviewed code: release workflows can access signing secrets. The hosted runner is ephemeral, and an always-run cleanup removes its temporary signing keychain. Review and download-test the draft artifact before publishing. Increase both the app marketing version and its numeric build number when preparing a new app version. Archive names and tag validation are derived from the project.
+Use **Actions → Signed macOS release → Run workflow**, choosing `main` and tag `v0.3.2`. Only run trusted reviewed code: release workflows can access signing secrets. The hosted runner is ephemeral, and an always-run cleanup removes its temporary signing keychain. Review and download-test the draft artifact before publishing. Increase both the app marketing version and its numeric build number when preparing a new app version. Archive names and tag validation are derived from the project.
 
 
 ### In-app updates
