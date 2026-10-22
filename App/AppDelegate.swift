@@ -23,13 +23,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /plugin install ayre@ayre
     """)
     private let commandGroup = NSStackView()
-    private let hotKeyCheckbox = NSButton(checkboxWithTitle: "Open the picker with ⌃⌥⌘P while Ayre is running", target: nil, action: nil)
     private let loginItemCheckbox = NSButton(checkboxWithTitle: "Start Ayre at login", target: nil, action: nil)
     private let automaticUpdatesCheckbox = NSButton(checkboxWithTitle: "Automatically check for updates", target: nil, action: nil)
     private let updateStatusLabel = NSTextField(wrappingLabelWithString: "")
     private let updateCheckButton = NSButton(title: "Check for Updates…", target: nil, action: nil)
-    private let hotKey = HotKey()
-    private let picker = PickerController()
+    private let store = PromptStore()
     private let loginItemController = LoginItemController()
     private let updaterController = UpdaterController()
     private var statusItem: NSStatusItem?
@@ -57,8 +55,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         refreshUpdateSettings()
         refreshStatus()
         refreshLoginItemStatus()
-        hotKeyCheckbox.state = .on
-        toggleHotKey()
         if startupPresentation.markWindowReady() {
             showWindow()
         }
@@ -125,8 +121,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         window.isReleasedWhenClosed = false
         window.delegate = self
 
-        hotKeyCheckbox.target = self
-        hotKeyCheckbox.action = #selector(toggleHotKey)
         loginItemCheckbox.target = self
         loginItemCheckbox.action = #selector(toggleLoginItem(_:))
         automaticUpdatesCheckbox.target = self
@@ -171,13 +165,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             makeButton("Reload Prompts", action: #selector(refreshStatus)),
         ])
 
-        let hotkeyHeading = sectionHeading("Picker shortcut")
-        let help = NSTextField(wrappingLabelWithString: """
-        Place the cursor in a text field. Use Spotlight: Ayre Go inserts the latest prompt; Ayre Pick lets you choose. Or press ⌃⌥⌘P, search, select with ↑↓, and press Return. Esc cancels.
-        Insertion requires focus to return to the original field. If the target or field state cannot be verified, nothing is written.
-        """)
-        help.textColor = .secondaryLabelColor
-
         let updateHeading = sectionHeading("Software updates")
         let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
         let versionLabel = NSTextField(labelWithString: "Current version: \(currentVersion)")
@@ -187,13 +174,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             commandGroup, sectionSeparator(), loginHeading, loginGroup,
             sectionSeparator(), promptsHeading, storeLabel, storeButtons,
             sectionSeparator(), updateHeading, versionLabel, updateStatusLabel, updateCheckButton, automaticUpdatesCheckbox,
-            sectionSeparator(), hotkeyHeading, hotKeyCheckbox, help,
         ])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 10
         stack.edgeInsets = NSEdgeInsets(top: 18, left: 20, bottom: 18, right: 20)
-        [subtitle, statusLabel, storeLabel, loginStatusLabel, help, installCommandsLabel, updateStatusLabel].forEach {
+        [subtitle, statusLabel, storeLabel, loginStatusLabel, installCommandsLabel, updateStatusLabel].forEach {
             $0.preferredMaxLayoutWidth = 640
         }
         let scrollView = NSScrollView(frame: window.contentView?.bounds ?? .zero)
@@ -295,8 +281,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             : "Accessibility permission is not granted. Request it here or open System Settings → Privacy & Security → Accessibility. After granting access, return to Ayre; the Claude Code setup commands will appear below."
         commandGroup.isHidden = !trusted
         updatePermissionStatusItem(isTrusted: trusted)
-        let (prompts, skipped) = picker.store.list()
-        storeLabel.stringValue = "Saved prompts: \(prompts.count) files\(skipped > 0 ? " (\(skipped) unreadable files skipped)" : "")\nFolder: \(picker.store.directory.path)\nFiles: <slug>.md, UTF-8, up to \(PromptStore.maxBytes / 1000) KB"
+        let (prompts, skipped) = store.list()
+        storeLabel.stringValue = "Saved prompts: \(prompts.count) files\(skipped > 0 ? " (\(skipped) unreadable files skipped)" : "")\nFolder: \(store.directory.path)\nFiles: <slug>.md, UTF-8, up to \(PromptStore.maxBytes / 1000) KB"
         AyreLog.log("AXIsProcessTrusted=\(trusted) prompts=\(prompts.count) skipped=\(skipped)")
     }
 
@@ -366,25 +352,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc private func openLog() { NSWorkspace.shared.open(AyreLog.logURL) }
 
     @objc private func openStore() {
-        try? FileManager.default.createDirectory(at: picker.store.directory, withIntermediateDirectories: true)
-        NSWorkspace.shared.open(picker.store.directory)
+        try? FileManager.default.createDirectory(at: store.directory, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(store.directory)
     }
 
     @objc private func toggleLoginItem(_ sender: NSButton) {
         let snapshot = loginItemController.setEnabled(sender.state == .on)
         loginItemCheckbox.state = snapshot.isToggleOn ? .on : .off
         loginStatusLabel.stringValue = snapshot.summary
-    }
-
-    @objc private func toggleHotKey() {
-        if hotKeyCheckbox.state == .on {
-            let status = hotKey.register { [weak self] in self?.picker.hotKeyPressed() }
-            AyreLog.log("RegisterEventHotKey(⌃⌥⌘P) -> OSStatus \(status)")
-            if status != noErr { hotKeyCheckbox.state = .off }
-        } else {
-            hotKey.unregister()
-            AyreLog.log("hotkey unregistered")
-        }
     }
 }
 
