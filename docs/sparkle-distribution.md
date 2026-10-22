@@ -78,6 +78,12 @@ Before publication, inspect: correct public key, valid Developer ID signature an
 
 Network/404 failures: retry the manual check after checking connectivity and the published latest assets. No update: compare `CFBundleVersion` with `sparkle:version`, including skipped versions and OS requirements. Signature failures: do not bypass validation; verify that the exact final ZIP was signed with the key matching the installed app, and publish a new correct version. A changed or missing public key requires a deliberately reviewed key-transition plan, not a casual replacement. Notarization or Gatekeeper failures must be fixed before distribution. Preserve the previous installed app and saved data when investigating; never delete the prompt folder as an update fix.
 
+## Isolated install regression test
+
+After building to resolve the pinned Sparkle framework, run `bash scripts/verify-sparkle-install.sh` on a Mac with a GUI session. It creates two temporary, ad-hoc-signed app versions with fresh UUID bundle identities and ephemeral signing keys. It confirms a one-bit-corrupted EdDSA signature leaves version 1.0 intact, and a valid signed archive is downloaded, installed, and relaunched as 2.0. The localhost archive bytes are compared with the signed source before installation. The fixture removes its apps, keys, servers, UUID preferences, and caches on exit.
+
+This test uses a programmatic test driver. It does not validate the standard update dialogs, Developer ID notarization, or Ayre's live Spotlight/Dock behavior. Those require the signed-artifact checks and manual acceptance below. See [fixture evidence](../verification/sparkle-install-fixture.md) and [signed release evidence](../verification/sparkle-distribution-run.md).
+
 ## Manual release acceptance
 
 Use a separate macOS account or disposable VM for install/restart tests. Install the previous test app in a temporary persistent directory and use two correctly signed test versions with a private test HTTPS appcast and separate bundle ID/keys. Never change production `SUFeedURL` defaults or replace the user's installed Ayre to run this test.

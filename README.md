@@ -92,6 +92,7 @@ swift run ayre insert --sample short --delay 5 --method auto
 bash scripts/verify-lifecycle.sh
 bash scripts/verify-updater-state.sh
 bash scripts/verify-sparkle-feed.sh
+bash scripts/verify-sparkle-install.sh
 python3 scripts/test-appcast.py
 python3 scripts/test-release.py
 bash plugins/ayre/tests/test-helper.sh
