@@ -32,4 +32,14 @@ The app signature was valid on disk, the notarization ticket validated, and Gate
 
 The embedded `SUPublicEDKey` matched the registered GitHub Actions public variable. The public value was read from the ignored local verification file for equality comparison and was not displayed. No private signing key was accessed. An independent CryptoKit Ed25519 verification using the embedded public key accepted the appcast signature over the downloaded ZIP bytes. This verifies the archive signature trust anchor without the private key. The feed itself is not signed; only the update archive carries an EdDSA signature.
 
-The package was not launched or installed. A manual downloaded-app smoke test and review of the draft release page remain pending before any public publication.
+During the independent artifact checks above, the package was not launched or installed.
+
+## User-reported downloaded-app acceptance — 2026-10-22
+
+The user downloaded the draft ZIP and confirmed the requested checks with its Ayre 0.2.2 app:
+
+- Settings closes to background residence with the Dock icon hidden, and reopening Ayre presents Settings.
+- The automatic-check preference survives relaunch.
+- Spotlight Ayre Go/Pick insert into the empty Codex field without presenting Settings/Dock, stealing the target focus, or submitting the message.
+
+These are user-reported manual results. The separate disposable-fixture test proves update replacement/relaunch and invalid-signature rejection with a test driver; it does not claim observation of every standard update dialog. The production feed remains unavailable until the first stable release is published. Public publication is still awaiting explicit user approval.
