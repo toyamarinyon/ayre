@@ -4,7 +4,7 @@ import CoreServices
 
 @main
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @MainActor static func main() {
         let app = NSApplication.shared
         let delegate = AppDelegate()
@@ -25,9 +25,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let commandGroup = NSStackView()
     private let hotKeyCheckbox = NSButton(checkboxWithTitle: "Open the picker with ⌃⌥⌘P while Ayre is running", target: nil, action: nil)
     private let loginItemCheckbox = NSButton(checkboxWithTitle: "Start Ayre at login", target: nil, action: nil)
+    private let automaticUpdatesCheckbox = NSButton(checkboxWithTitle: "Automatically check for updates", target: nil, action: nil)
+    private let updateStatusLabel = NSTextField(wrappingLabelWithString: "")
+    private let updateCheckButton = NSButton(title: "Check for Updates…", target: nil, action: nil)
     private let hotKey = HotKey()
     private let picker = PickerController()
     private let loginItemController = LoginItemController()
+    private let updaterController = UpdaterController()
     private var statusItem: NSStatusItem?
     private var defaultLaunch: Bool?
     private var startupPresentation = StartupWindowPresentation()
@@ -38,15 +42,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        ProbeLog.echoToStderr = false
-        ProbeLog.section("App launched")
-        ProbeEnvironment.log()
+        AyreLog.echoToStderr = false
+        AyreLog.section("App launched")
+        AyreEnvironment.log()
         if defaultLaunch == nil {
             recordDefaultLaunch(AppLifecycle.isDefaultLaunch(notification))
         }
-        ProbeLog.log("NSApplicationLaunchIsDefaultLaunchKey=\(defaultLaunch.map(String.init) ?? "unknown")")
+        AyreLog.log("NSApplicationLaunchIsDefaultLaunchKey=\(defaultLaunch.map(String.init) ?? "unknown")")
         buildMenu()
         buildWindow()
+        updaterController.onScheduledUpdateAvailable = { [weak self] in self?.refreshUpdateSettings() }
+        updaterController.onCanCheckForUpdatesChange = { [weak self] in self?.refreshUpdateSettings() }
+        updaterController.start()
+        refreshUpdateSettings()
         refreshStatus()
         refreshLoginItemStatus()
         hotKeyCheckbox.state = .on
@@ -68,7 +76,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let kind = AppLifecycle.initialOpenApplicationKind(from: openEvent)
         let shouldPresent = startupPresentation.recordOpenApplicationEvent(kind)
         let eventSummary = openEvent.map { "\($0.eventClass)/\($0.eventID)" } ?? "unknown"
-        ProbeLog.log("Initial open event=\(eventSummary), kind=\(kind), defaultLaunch=\(defaultLaunch.map(String.init) ?? "unknown"), present=\(shouldPresent)")
+        AyreLog.log("Initial open event=\(eventSummary), kind=\(kind), defaultLaunch=\(defaultLaunch.map(String.init) ?? "unknown"), present=\(shouldPresent)")
         if shouldPresent {
             showWindow()
         }
@@ -86,7 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         let senderPID = event?.attributeDescriptor(forKeyword: keySenderPIDAttr)?.int32Value
         let senderBundle = senderPID.flatMap { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier } ?? "unknown"
-        ProbeLog.log("Reopen event=\(event?.eventID ?? 0) activationExpected=\(expected.map(String.init) ?? "missing") active=\(sender.isActive) sender=\(senderBundle) showSettings=\(shouldShow)")
+        AyreLog.log("Reopen event=\(event?.eventID ?? 0) activationExpected=\(expected.map(String.init) ?? "missing") active=\(sender.isActive) sender=\(senderBundle) showSettings=\(shouldShow)")
         if shouldShow { showWindow() }
         return false
     }
@@ -101,6 +109,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidBecomeActive(_ notification: Notification) {
         refreshStatus()
         refreshLoginItemStatus()
+        refreshUpdateSettings()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
@@ -120,6 +129,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotKeyCheckbox.action = #selector(toggleHotKey)
         loginItemCheckbox.target = self
         loginItemCheckbox.action = #selector(toggleLoginItem(_:))
+        automaticUpdatesCheckbox.target = self
+        automaticUpdatesCheckbox.action = #selector(toggleAutomaticUpdateChecks(_:))
+        updateCheckButton.target = self
+        updateCheckButton.action = #selector(checkForUpdates(_:))
 
         let title = NSTextField(labelWithString: "Ayre")
         title.font = .systemFont(ofSize: 24, weight: .semibold)
@@ -165,17 +178,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         """)
         help.textColor = .secondaryLabelColor
 
+        let updateHeading = sectionHeading("Software updates")
+        let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+        let versionLabel = NSTextField(labelWithString: "Current version: \(currentVersion)")
+
         let stack = NSStackView(views: [
             title, subtitle, sectionSeparator(), permissionHeading, statusLabel, permissionButtons, logButton,
             commandGroup, sectionSeparator(), loginHeading, loginGroup,
             sectionSeparator(), promptsHeading, storeLabel, storeButtons,
+            sectionSeparator(), updateHeading, versionLabel, updateStatusLabel, updateCheckButton, automaticUpdatesCheckbox,
             sectionSeparator(), hotkeyHeading, hotKeyCheckbox, help,
         ])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 10
         stack.edgeInsets = NSEdgeInsets(top: 18, left: 20, bottom: 18, right: 20)
-        [subtitle, statusLabel, storeLabel, loginStatusLabel, help, installCommandsLabel].forEach {
+        [subtitle, statusLabel, storeLabel, loginStatusLabel, help, installCommandsLabel, updateStatusLabel].forEach {
             $0.preferredMaxLayoutWidth = 640
         }
         let scrollView = NSScrollView(frame: window.contentView?.bounds ?? .zero)
@@ -249,6 +267,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appMenu.addItem(withTitle: "Settings…", action: #selector(showWindow), keyEquivalent: ",")
         appMenu.items.last?.target = self
         appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates(_:)), keyEquivalent: "")
+        appMenu.items.last?.target = self
+        appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Quit Ayre", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         NSApp.mainMenu = menu
@@ -276,14 +297,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updatePermissionStatusItem(isTrusted: trusted)
         let (prompts, skipped) = picker.store.list()
         storeLabel.stringValue = "Saved prompts: \(prompts.count) files\(skipped > 0 ? " (\(skipped) unreadable files skipped)" : "")\nFolder: \(picker.store.directory.path)\nFiles: <slug>.md, UTF-8, up to \(PromptStore.maxBytes / 1000) KB"
-        ProbeLog.log("AXIsProcessTrusted=\(trusted) prompts=\(prompts.count) skipped=\(skipped)")
+        AyreLog.log("AXIsProcessTrusted=\(trusted) prompts=\(prompts.count) skipped=\(skipped)")
     }
 
     private func refreshLoginItemStatus(operationError: String? = nil) {
         let snapshot = loginItemController.snapshot(operationError: operationError)
         loginItemCheckbox.state = snapshot.isToggleOn ? .on : .off
         loginStatusLabel.stringValue = snapshot.summary
-        ProbeLog.log("SMAppService.mainApp.status=\(snapshot.status)")
+        AyreLog.log("SMAppService.mainApp.status=\(snapshot.status)")
+    }
+
+    private func refreshUpdateSettings() {
+        let available = updaterController.updater != nil
+        if let configurationError = updaterController.configurationError {
+            updateStatusLabel.stringValue = configurationError
+        } else if let version = updaterController.scheduledUpdateAvailable {
+            updateStatusLabel.stringValue = "Version \(version) is available. Choose Check for Updates… to review it."
+        } else {
+            updateStatusLabel.stringValue = ""
+        }
+        updateStatusLabel.textColor = .secondaryLabelColor
+        updateCheckButton.isEnabled = available && updaterController.canCheckForUpdates
+        automaticUpdatesCheckbox.isEnabled = available
+        automaticUpdatesCheckbox.state = updaterController.automaticallyChecksForUpdates() ? .on : .off
+    }
+
+    @objc private func toggleAutomaticUpdateChecks(_ sender: NSButton) {
+        updaterController.setAutomaticChecksEnabled(sender.state == .on)
+        refreshUpdateSettings()
+    }
+
+    @objc private func checkForUpdates(_ sender: Any?) {
+        guard updaterController.canCheckForUpdates else {
+            refreshUpdateSettings()
+            return
+        }
+        updaterController.checkForUpdates(sender)
+    }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        guard menuItem.action == #selector(checkForUpdates(_:)) else { return true }
+        return updaterController.updater != nil && updaterController.canCheckForUpdates
     }
 
     @objc private func requestPermission() {
@@ -309,7 +363,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    @objc private func openLog() { NSWorkspace.shared.open(ProbeLog.logURL) }
+    @objc private func openLog() { NSWorkspace.shared.open(AyreLog.logURL) }
 
     @objc private func openStore() {
         try? FileManager.default.createDirectory(at: picker.store.directory, withIntermediateDirectories: true)
@@ -325,11 +379,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func toggleHotKey() {
         if hotKeyCheckbox.state == .on {
             let status = hotKey.register { [weak self] in self?.picker.hotKeyPressed() }
-            ProbeLog.log("RegisterEventHotKey(⌃⌥⌘P) -> OSStatus \(status)")
+            AyreLog.log("RegisterEventHotKey(⌃⌥⌘P) -> OSStatus \(status)")
             if status != noErr { hotKeyCheckbox.state = .off }
         } else {
             hotKey.unregister()
-            ProbeLog.log("hotkey unregistered")
+            AyreLog.log("hotkey unregistered")
         }
     }
 }

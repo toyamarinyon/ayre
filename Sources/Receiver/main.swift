@@ -1,5 +1,5 @@
 import AppKit
-import ProbeCore
+import AyreCore
 
 /// Test receiver: independently compares its own NSTextView content against the expected result,
 /// without going through the Accessibility API.
@@ -32,7 +32,7 @@ final class Receiver: NSObject, NSApplicationDelegate, NSTextViewDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 720, height: 560),
                           styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
-        window.title = "PromptInsertProbe Receiver"
+        window.title = "Ayre Receiver"
         SamplePrompts.all.forEach { samplePopup.addItem(withTitle: "\($0.title) (\($0.id))") }
         Scenario.allCases.forEach { scenarioPopup.addItem(withTitle: $0.title) }
 

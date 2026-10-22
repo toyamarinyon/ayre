@@ -16,14 +16,14 @@ public enum SamplePrompts {
     public static let short = SamplePrompt(
         id: "short",
         title: "Short test",
-        text: "PromptInsertProbe 短文テスト：こんにちは。"
+        text: "Ayre 短文テスト：こんにちは。"
     )
 
     public static let markdown = SamplePrompt(
         id: "markdown",
         title: "Markdown test",
         text: """
-        # PromptInsertProbe Markdownテスト
+        # Ayre Markdownテスト
 
         ## 日本語と絵文字
         - 日本語：漢字・ひらがな・カタカナ・全角記号「」（）、。
@@ -58,7 +58,7 @@ public enum SamplePrompts {
     )
 
     public static let long: SamplePrompt = {
-        var lines: [String] = ["# PromptInsertProbe 長文テスト", ""]
+        var lines: [String] = ["# Ayre 長文テスト", ""]
         let total = 400
         for i in 1...total {
             let n = String(format: "%04d", i)

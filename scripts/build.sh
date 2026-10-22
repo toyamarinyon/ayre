@@ -22,6 +22,18 @@ while [[ $# -gt 0 ]]; do
 done
 swift_args=(-c release)
 xcode_args=()
+# Public key is not a secret; empty keys intentionally disable updates in local builds.
+if [[ -n "${AYRE_SPARKLE_PUBLIC_ED_KEY:-}" ]]; then
+  python3 - <<'CHECK_KEY'
+import base64, os
+try:
+    key = base64.b64decode(os.environ["AYRE_SPARKLE_PUBLIC_ED_KEY"], validate=True)
+    assert len(key) == 32
+except Exception:
+    raise SystemExit("AYRE_SPARKLE_PUBLIC_ED_KEY must be a Base64 Ed25519 public key")
+CHECK_KEY
+  xcode_args+=(AYRE_SPARKLE_PUBLIC_ED_KEY="$AYRE_SPARKLE_PUBLIC_ED_KEY")
+fi
 if $universal; then
   swift_args+=(--arch arm64 --arch x86_64)
   xcode_args+=(ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO)
@@ -33,6 +45,9 @@ case "$mode" in
   unsigned) xcode_args+=(CODE_SIGNING_ALLOWED=NO) ;;
   development) xcode_args+=(CODE_SIGNING_ALLOWED=YES DEVELOPMENT_TEAM="$team" CODE_SIGN_IDENTITY="Apple Development") ;;
   distribution)
+    if [[ -z "${AYRE_SPARKLE_PUBLIC_ED_KEY:-}" ]]; then
+      echo "Distribution requires AYRE_SPARKLE_PUBLIC_ED_KEY; refusing an update-disabled release." >&2; exit 2
+    fi
     if [[ "$identity" != 'Developer ID Application:'* || "$identity" != *')' ]]; then
       echo 'Public distribution requires a Developer ID Application identity including its team suffix.' >&2; exit 2
     fi
@@ -41,7 +56,7 @@ case "$mode" in
     xcode_args+=(CODE_SIGNING_ALLOWED=YES CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="$team" CODE_SIGN_IDENTITY="$identity" CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO)
     ;;
 esac
-xcodebuild -project PromptInsertProbe.xcodeproj -scheme PromptInsertProbe -configuration "$configuration" \
+xcodebuild -project Ayre.xcodeproj -scheme Ayre -configuration "$configuration" \
   -derivedDataPath "$derived_data" "${xcode_args[@]}" clean build
 app="$derived_data/Build/Products/$configuration/Ayre.app"
 # Resolve the exact certificate selected by Xcode, without reading private key material.
@@ -59,6 +74,14 @@ chmod 755 "$app/Contents/MacOS/ayre"
 if [[ "$mode" != unsigned ]]; then
   signing_args=(--force --options runtime --sign "$identity")
   if [[ "$mode" == distribution ]]; then signing_args+=(--timestamp); fi
+  framework="$app/Contents/Frameworks/Sparkle.framework"
+  if [[ -d "$framework" ]]; then
+    # Sign nested code inside out, preserving helper entitlements. Never use --deep to sign.
+    while IFS= read -r -d '' nested; do
+      codesign "${signing_args[@]}" --preserve-metadata=entitlements "$nested"
+    done < <(find "$framework/Versions/B" -depth \( -name '*.xpc' -o -name '*.app' -o -name Autoupdate \) -print0)
+    codesign "${signing_args[@]}" --preserve-metadata=entitlements "$framework"
+  fi
   codesign "${signing_args[@]}" "$app/Contents/MacOS/ayre"
   codesign "${signing_args[@]}" --preserve-metadata=entitlements "$app"
   codesign --verify --deep --strict --verbose=2 "$app"
@@ -74,5 +97,5 @@ if $universal; then
   done
 fi
 "$app/Contents/MacOS/ayre" capabilities --json
-printf '\nApp: %s\nReceiver: %s\nSigning mode: %s\n' "$app" "$bin_dir/PromptInsertProbeReceiver" "$mode"
+printf '\nApp: %s\nReceiver: %s\nSigning mode: %s\n' "$app" "$bin_dir/AyreReceiver" "$mode"
 echo 'Install or register this app with Launch Services before testing discovery/App Intents. See README.md.'

@@ -6,8 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		B10000000000000000000001 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = B10000000000000000000002 /* Sparkle */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
-		A1B2C3D4E5F6000000000001 /* PromptInsertProbe.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ayre.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1B2C3D4E5F6000000000001 /* Ayre.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ayre.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -20,6 +24,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B10000000000000000000001 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -38,7 +43,7 @@
 		A1B2C3D4E5F6000000000006 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A1B2C3D4E5F6000000000001 /* PromptInsertProbe.app */,
+				A1B2C3D4E5F6000000000001 /* Ayre.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -46,9 +51,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A1B2C3D4E5F6000000000007 /* PromptInsertProbe */ = {
+		A1B2C3D4E5F6000000000007 /* Ayre */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A1B2C3D4E5F600000000000A /* Build configuration list for PBXNativeTarget "PromptInsertProbe" */;
+			buildConfigurationList = A1B2C3D4E5F600000000000A /* Build configuration list for PBXNativeTarget "Ayre" */;
 			buildPhases = (
 				A1B2C3D4E5F6000000000008 /* Sources */,
 				A1B2C3D4E5F6000000000004 /* Frameworks */,
@@ -62,11 +67,12 @@
 				A1B2C3D4E5F6000000000002 /* App */,
 				A1B2C3D4E5F6000000000003 /* Core */,
 			);
-			name = PromptInsertProbe;
+			name = Ayre;
 			packageProductDependencies = (
+				B10000000000000000000002 /* Sparkle */,
 			);
-			productName = PromptInsertProbe;
-			productReference = A1B2C3D4E5F6000000000001 /* PromptInsertProbe.app */;
+			productName = Ayre;
+			productReference = A1B2C3D4E5F6000000000001 /* Ayre.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -84,7 +90,7 @@
 					};
 				};
 			};
-			buildConfigurationList = A1B2C3D4E5F600000000000B /* Build configuration list for PBXProject "PromptInsertProbe" */;
+			buildConfigurationList = A1B2C3D4E5F600000000000B /* Build configuration list for PBXProject "Ayre" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -94,12 +100,13 @@
 			);
 			mainGroup = A1B2C3D4E5F6000000000005;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (B10000000000000000000003 /* Sparkle */);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A1B2C3D4E5F6000000000006 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A1B2C3D4E5F6000000000007 /* PromptInsertProbe */,
+				A1B2C3D4E5F6000000000007 /* Ayre */,
 			);
 		};
 /* End PBXProject section */
@@ -171,10 +178,11 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/Ayre-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Ayre;
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
@@ -184,7 +192,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.2.1;
+				MARKETING_VERSION = 0.2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.toyamarinyon.ayre;
 				PRODUCT_NAME = Ayre;
 				EXECUTABLE_NAME = AyreApp;
@@ -198,10 +206,11 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/Ayre-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Ayre;
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
@@ -211,7 +220,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.2.1;
+				MARKETING_VERSION = 0.2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.toyamarinyon.ayre;
 				PRODUCT_NAME = Ayre;
 				EXECUTABLE_NAME = AyreApp;
@@ -221,8 +230,15 @@
 		};
 /* End XCBuildConfiguration section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		B10000000000000000000003 /* Sparkle */ = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/sparkle-project/Sparkle"; requirement = {kind = exactVersion; version = 2.10.0; }; };
+/* End XCRemoteSwiftPackageReference section */
+/* Begin XCSwiftPackageProductDependency section */
+		B10000000000000000000002 /* Sparkle */ = {isa = XCSwiftPackageProductDependency; package = B10000000000000000000003 /* Sparkle */; productName = Sparkle; };
+/* End XCSwiftPackageProductDependency section */
+
 /* Begin XCConfigurationList section */
-		A1B2C3D4E5F600000000000B /* Build configuration list for PBXProject "PromptInsertProbe" */ = {
+		A1B2C3D4E5F600000000000B /* Build configuration list for PBXProject "Ayre" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A1B2C3D4E5F600000000000F /* Debug */,
@@ -231,7 +247,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A1B2C3D4E5F600000000000A /* Build configuration list for PBXNativeTarget "PromptInsertProbe" */ = {
+		A1B2C3D4E5F600000000000A /* Build configuration list for PBXNativeTarget "Ayre" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A1B2C3D4E5F600000000000D /* Debug */,

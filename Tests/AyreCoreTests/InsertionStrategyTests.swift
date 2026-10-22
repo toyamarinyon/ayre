@@ -1,5 +1,5 @@
 import XCTest
-@testable import ProbeCore
+@testable import AyreCore
 
 final class InsertionStrategyTests: XCTestCase {
     func testOnlyCodexGetsTheCodexAdaptation() {

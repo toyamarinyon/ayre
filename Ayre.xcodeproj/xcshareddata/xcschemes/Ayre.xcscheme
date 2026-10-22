@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A1B2C3D4E5F6000000000007"
-               BuildableName = "PromptInsertProbe.app"
-               BlueprintName = "PromptInsertProbe"
-               ReferencedContainer = "container:PromptInsertProbe.xcodeproj">
+               BuildableName = "Ayre.app"
+               BlueprintName = "Ayre"
+               ReferencedContainer = "container:Ayre.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -37,9 +37,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A1B2C3D4E5F6000000000007"
-            BuildableName = "PromptInsertProbe.app"
-            BlueprintName = "PromptInsertProbe"
-            ReferencedContainer = "container:PromptInsertProbe.xcodeproj">
+            BuildableName = "Ayre.app"
+            BlueprintName = "Ayre"
+            ReferencedContainer = "container:Ayre.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>

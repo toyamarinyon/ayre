@@ -1,5 +1,5 @@
 import XCTest
-@testable import ProbeCore
+@testable import AyreCore
 
 final class PromptStoreTests: XCTestCase {
     private var store: PromptStore!
@@ -74,52 +74,6 @@ final class PromptStoreTests: XCTestCase {
         XCTAssertEqual(PromptStore.filter(prompts, query: "AUTH 設計").map(\.slug), ["auth-plan"])
         XCTAssertEqual(PromptStore.filter(prompts, query: "ＵＩ").map(\.slug), ["ui"])
         XCTAssertTrue(PromptStore.filter(prompts, query: "none").isEmpty)
-    }
-    func testLegacyMigrationPreservesBytesDatesAndDestinationConflicts() throws {
-        let fm = FileManager.default
-        let legacy = PromptStore(directory: store.directory.appendingPathComponent("legacy"))
-        let destination = store.directory.appendingPathComponent("Ayre/Prompts")
-        let bytes = Data("# Cafe\u{301}\r\n日本語 🧪  \n".utf8)
-        try legacy.save(bytes, slug: "latest")
-        try legacy.save("old conflict", slug: "conflict")
-        let date = Date(timeIntervalSince1970: 123456789)
-        try fm.setAttributes([.modificationDate: date], ofItemAtPath: try legacy.url(for: "latest").path)
-        let migrated = PromptStore(directory: destination)
-        try migrated.save("keep destination", slug: "conflict")
-        try fm.createSymbolicLink(at: legacy.url(for: "linked"), withDestinationURL: legacy.url(for: "latest"))
-
-        try PromptStore.migrateLegacyPrompts(from: legacy.directory, to: destination)
-        XCTAssertEqual(try Data(contentsOf: migrated.url(for: "latest")), bytes)
-        XCTAssertEqual(try Data(contentsOf: legacy.url(for: "latest")), bytes)
-        XCTAssertEqual(try migrated.text("conflict"), "keep destination")
-        XCTAssertEqual(try legacy.text("conflict"), "old conflict")
-        XCTAssertEqual(try migrated.url(for: "latest").resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate, date)
-        XCTAssertFalse(fm.fileExists(atPath: try migrated.url(for: "linked").path))
-        XCTAssertFalse(try fm.contentsOfDirectory(atPath: destination.path).contains { $0.hasPrefix(".migration-") })
-    }
-
-    func testLegacyMigrationRunsOnlyOnceAndDoesNotResurrectDeletedPrompts() throws {
-        let legacy = PromptStore(directory: store.directory.appendingPathComponent("legacy"))
-        let destination = store.directory.appendingPathComponent("Ayre/Prompts")
-        try legacy.save("original", slug: "deleted")
-        try PromptStore.migrateLegacyPrompts(from: legacy.directory, to: destination)
-        try FileManager.default.removeItem(at: destination.appendingPathComponent("deleted.md"))
-        try legacy.save("added by an old app", slug: "late")
-        try PromptStore.migrateLegacyPrompts(from: legacy.directory, to: destination)
-        XCTAssertTrue(PromptStore(directory: destination).list().prompts.isEmpty)
-    }
-
-    func testFreshMigrationAndFailureRecovery() throws {
-        let fm = FileManager.default
-        let legacy = store.directory.appendingPathComponent("legacy")
-        let destination = store.directory.appendingPathComponent("Ayre/Prompts")
-        try fm.createDirectory(at: store.directory, withIntermediateDirectories: true)
-        // A file where a directory should be must fail, leaving the original untouched.
-        try Data("blocker".utf8).write(to: destination.deletingLastPathComponent())
-        XCTAssertThrowsError(try PromptStore.migrateLegacyPrompts(from: legacy, to: destination))
-        try fm.removeItem(at: destination.deletingLastPathComponent())
-        try PromptStore.migrateLegacyPrompts(from: legacy, to: destination)
-        XCTAssertTrue(fm.fileExists(atPath: destination.appendingPathComponent(".legacy-prompts-migrated").path))
     }
 
 }

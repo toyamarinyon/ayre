@@ -6,7 +6,6 @@ on:
       tag:
         description: Release tag (must match the app version)
         required: true
-        default: v0.2.1
         type: string
 
 permissions:
@@ -34,8 +33,8 @@ jobs:
           python3 - <<'PY'
           import os, re
           tag = os.environ['RELEASE_TAG']
-          if tag != 'v0.2.1' or not re.fullmatch(r'v\d+\.\d+\.\d+', tag):
-              raise SystemExit('The current app version requires tag v0.2.1')
+          if not re.fullmatch(r'v\d+\.\d+\.\d+', tag):
+              raise SystemExit('A stable app release requires a vMAJOR.MINOR.PATCH tag')
           PY
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo 'A release already exists for this tag; refusing to replace it.' >&2
@@ -49,6 +48,7 @@ jobs:
           swift test -c release
           bash scripts/verify-lifecycle.sh
           bash plugins/ayre/tests/test-helper.sh
+          python3 scripts/test-release.py
 
       - name: Import distribution signing identity
         env:
@@ -99,8 +99,79 @@ jobs:
             --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD"
 
+      - name: Check latest feed and collect published version history
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIOUS_APPCAST_DIR: ${{ runner.temp }}/previous-appcasts
+        run: |
+          set -euo pipefail
+          mkdir -p "$PREVIOUS_APPCAST_DIR"
+          # The Info.plist feed URL resolves GitHub's repository-wide latest
+          # non-prerelease. Refuse a repo release that would make that URL lack a
+          # feed. First release has no latest release yet, which is expected.
+          latest_error="$RUNNER_TEMP/latest-release-error.txt"
+          latest_payload="$RUNNER_TEMP/latest-release.json"
+          if gh api "repos/$GITHUB_REPOSITORY/releases/latest" > "$latest_payload" 2>"$latest_error"; then
+            latest_tag=$(python3 -c 'import json, pathlib, sys; print(json.loads(pathlib.Path(sys.argv[1]).read_text())["tag_name"])' "$latest_payload")
+            python3 - "$latest_payload" <<'PY'
+          import json, pathlib, re, sys
+          release = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assets = {asset.get('name') for asset in release.get('assets', [])}
+          if not re.fullmatch(r'v\d+\.\d+\.\d+', release.get('tag_name', '')):
+              raise SystemExit('GitHub latest release is not a stable Ayre vMAJOR.MINOR.PATCH release.')
+          if 'appcast.xml' not in assets or not any(name and name.startswith('Ayre-') and name.endswith('-macOS.zip') for name in assets):
+              raise SystemExit('GitHub latest release is missing the Ayre ZIP or appcast.xml; the configured Sparkle feed URL would be broken.')
+          PY
+            mkdir -p "$PREVIOUS_APPCAST_DIR/latest"
+            if ! gh release download "$latest_tag" --repo "$GITHUB_REPOSITORY" --pattern appcast.xml --dir "$PREVIOUS_APPCAST_DIR/latest"; then
+              echo "Latest stable GitHub release $latest_tag has no appcast.xml; the configured Sparkle latest/download URL would be broken." >&2
+              exit 1
+            fi
+          elif grep -q 'HTTP 404' "$latest_error"; then
+            echo 'No published stable release exists yet; starting feed history with this Ayre release.'
+          else
+            cat "$latest_error" >&2
+            exit 1
+          fi
+
+          release_pages="$RUNNER_TEMP/github-releases.json"
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$release_pages"
+          stable_tags="$RUNNER_TEMP/appcast-release-tags.txt"
+          python3 - "$release_pages" > "$stable_tags" <<'PY'
+          import json, pathlib, re, sys
+          payload = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          releases = [item for page in payload for item in page] if payload and isinstance(payload[0], list) else payload
+          for release in releases:
+              tag = release.get('tag_name', '')
+              if release.get('draft') or release.get('prerelease') or not re.fullmatch(r'v\d+\.\d+\.\d+', tag):
+                  continue
+              if any(asset.get('name') == 'appcast.xml' for asset in release.get('assets', [])):
+                  print(tag)
+          PY
+          while IFS= read -r stable_tag; do
+            [[ -n "$stable_tag" ]] || continue
+            [[ "$stable_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Invalid release tag in GitHub history.' >&2; exit 1; }
+            mkdir -p "$PREVIOUS_APPCAST_DIR/$stable_tag"
+            gh release download "$stable_tag" --repo "$GITHUB_REPOSITORY" --pattern appcast.xml --dir "$PREVIOUS_APPCAST_DIR/$stable_tag"
+          done < "$stable_tags"
+
       - name: Build, sign, notarize, and verify universal package
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          AYRE_SPARKLE_PUBLIC_ED_KEY: ${{ vars.AYRE_SPARKLE_PUBLIC_ED_KEY }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          PREVIOUS_APPCAST_DIR: ${{ runner.temp }}/previous-appcasts
         run: bash scripts/release.sh "$AYRE_SIGNING_IDENTITY" ayre-ci
+
+      - name: Test generated and tamper-detecting Sparkle appcasts
+        env:
+          SPARKLE_BIN: build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin
+        run: python3 scripts/test-appcast.py
+
+      - name: Test Sparkle feed and updater state without installing updates
+        run: |
+          bash scripts/verify-sparkle-feed.sh
+          bash scripts/verify-updater-state.sh
 
       - name: Create draft release
         env:
@@ -108,16 +179,17 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          archive=build/release/Ayre-0.2.1-macOS.zip
-          (cd build/release && shasum -a 256 Ayre-0.2.1-macOS.zip > SHA256SUMS)
-          cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
-          Ayre 0.2.1 for macOS 14 and later (Apple Silicon and Intel).
+          version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' build/DerivedData/Build/Products/Release/Ayre.app/Contents/Info.plist)
+          archive="build/release/Ayre-${version}-macOS.zip"
+          test -f "$archive" -a -f build/release/appcast.xml -a -f build/release/SHA256SUMS
+          cat > "$RUNNER_TEMP/release-notes.md" <<NOTES
+          Ayre ${RELEASE_TAG#v} for macOS 14 and later (Apple Silicon and Intel).
 
           Download the ZIP, extract Ayre.app, move it to a persistent location, and open it to grant Accessibility permission. Install the Claude Code plugin using the commands shown in Settings. Use Ayre Go or Ayre Pick in Spotlight to insert saved prompts without sending.
 
           This package is Developer ID signed and notarized. Review the artifact and perform a downloaded-app smoke test before publishing this draft.
           NOTES
-          gh release create "$RELEASE_TAG" "$archive" build/release/SHA256SUMS \
+          gh release create "$RELEASE_TAG" "$archive" build/release/appcast.xml build/release/SHA256SUMS \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "Ayre ${RELEASE_TAG#v}" --notes-file "$RUNNER_TEMP/release-notes.md" --draft
 
