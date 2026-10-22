@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-import ProbeCore
+import AyreCore
 
 final class CLIIntegrationTests: XCTestCase {
     private var executable: URL {

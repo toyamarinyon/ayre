@@ -11,7 +11,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		A1B2C3D4E5F6000000000001 /* PromptInsertProbe.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ayre.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1B2C3D4E5F6000000000001 /* Ayre.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ayre.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -43,7 +43,7 @@
 		A1B2C3D4E5F6000000000006 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A1B2C3D4E5F6000000000001 /* PromptInsertProbe.app */,
+				A1B2C3D4E5F6000000000001 /* Ayre.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -51,9 +51,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A1B2C3D4E5F6000000000007 /* PromptInsertProbe */ = {
+		A1B2C3D4E5F6000000000007 /* Ayre */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A1B2C3D4E5F600000000000A /* Build configuration list for PBXNativeTarget "PromptInsertProbe" */;
+			buildConfigurationList = A1B2C3D4E5F600000000000A /* Build configuration list for PBXNativeTarget "Ayre" */;
 			buildPhases = (
 				A1B2C3D4E5F6000000000008 /* Sources */,
 				A1B2C3D4E5F6000000000004 /* Frameworks */,
@@ -67,12 +67,12 @@
 				A1B2C3D4E5F6000000000002 /* App */,
 				A1B2C3D4E5F6000000000003 /* Core */,
 			);
-			name = PromptInsertProbe;
+			name = Ayre;
 			packageProductDependencies = (
 				B10000000000000000000002 /* Sparkle */,
 			);
-			productName = PromptInsertProbe;
-			productReference = A1B2C3D4E5F6000000000001 /* PromptInsertProbe.app */;
+			productName = Ayre;
+			productReference = A1B2C3D4E5F6000000000001 /* Ayre.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -90,7 +90,7 @@
 					};
 				};
 			};
-			buildConfigurationList = A1B2C3D4E5F600000000000B /* Build configuration list for PBXProject "PromptInsertProbe" */;
+			buildConfigurationList = A1B2C3D4E5F600000000000B /* Build configuration list for PBXProject "Ayre" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -106,7 +106,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A1B2C3D4E5F6000000000007 /* PromptInsertProbe */,
+				A1B2C3D4E5F6000000000007 /* Ayre */,
 			);
 		};
 /* End PBXProject section */
@@ -238,7 +238,7 @@
 /* End XCSwiftPackageProductDependency section */
 
 /* Begin XCConfigurationList section */
-		A1B2C3D4E5F600000000000B /* Build configuration list for PBXProject "PromptInsertProbe" */ = {
+		A1B2C3D4E5F600000000000B /* Build configuration list for PBXProject "Ayre" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A1B2C3D4E5F600000000000F /* Debug */,
@@ -247,7 +247,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A1B2C3D4E5F600000000000A /* Build configuration list for PBXNativeTarget "PromptInsertProbe" */ = {
+		A1B2C3D4E5F600000000000A /* Build configuration list for PBXNativeTarget "Ayre" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A1B2C3D4E5F600000000000D /* Debug */,

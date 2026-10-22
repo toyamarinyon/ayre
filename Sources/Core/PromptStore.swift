@@ -36,50 +36,13 @@ public struct PromptStore {
 
     public static var defaultDirectory: URL {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let destination = support.appendingPathComponent("Ayre/Prompts", isDirectory: true)
-        let legacy = support.appendingPathComponent("PromptInsertProbe/Prompts", isDirectory: true)
-        do {
-            try migrateLegacyPrompts(from: legacy, to: destination)
-            return destination
-        } catch {
-            // Keep existing prompts accessible if migration cannot finish (for example, disk full).
-            ProbeLog.log("Prompt folder migration failed; retaining the legacy folder: \(error)")
-            return FileManager.default.fileExists(atPath: legacy.path) ? legacy : destination
-        }
+        return support.appendingPathComponent("Ayre/Prompts", isDirectory: true)
     }
 
     public let directory: URL
 
     public init(directory: URL = PromptStore.defaultDirectory) {
         self.directory = directory
-    }
-
-    /// One-time copy, retaining originals and modification dates. Existing destination entries win.
-    /// Hidden staging files and atomic publication prevent concurrent app/CLI readers seeing partial copies.
-    static func migrateLegacyPrompts(from source: URL, to destination: URL) throws {
-        let fm = FileManager.default
-        let marker = destination.appendingPathComponent(".legacy-prompts-migrated")
-        if fm.fileExists(atPath: marker.path) { return }
-        try fm.createDirectory(at: destination, withIntermediateDirectories: true)
-        if fm.fileExists(atPath: source.path) {
-            let files = try fm.contentsOfDirectory(at: source,
-                includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey], options: [.skipsHiddenFiles])
-            for file in files where file.pathExtension == fileExtension {
-                let properties = try file.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
-                guard properties.isRegularFile == true, properties.isSymbolicLink != true else { continue }
-                let target = destination.appendingPathComponent(file.lastPathComponent)
-                let staging = destination.appendingPathComponent(".migration-\(UUID().uuidString)")
-                defer { try? fm.removeItem(at: staging) }
-                try fm.copyItem(at: file, to: staging)
-                guard link(staging.path, target.path) == 0 else {
-                    if errno == EEXIST { continue }
-                    throw PromptStoreError.writeFailed(file.lastPathComponent, String(cString: strerror(errno)))
-                }
-            }
-        }
-        // Never resurrect deleted Ayre prompts from the retained legacy backup on later launches.
-        try Data("Legacy prompt migration completed. Original files were retained.\n".utf8)
-            .write(to: marker, options: .atomic)
     }
 
     public static func isValidSlug(_ slug: String) -> Bool {

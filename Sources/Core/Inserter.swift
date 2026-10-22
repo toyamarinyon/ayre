@@ -31,20 +31,20 @@ public enum Inserter {
         case codexValue = "AXValue (Codex automatic empty-field detection)"
     }
 
-    public static func insert(_ text: String, into target: FocusTarget, method: Method = .selectedText) -> Result<InsertOutcome, ProbeError> {
+    public static func insert(_ text: String, into target: FocusTarget, method: Method = .selectedText) -> Result<InsertOutcome, AyreError> {
         if case .failure(let e) = Focus.checkEditable(target) { return .failure(e) }
         let el = target.element
-        ProbeLog.log("insert: text \(TextStats(text))")
+        AyreLog.log("insert: text \(TextStats(text))")
 
         let beforeValue = AX.string(el, kAXValueAttribute)
         let beforeRange = AX.range(el, kAXSelectedTextRangeAttribute)
         let beforeCount = AX.int(el, kAXNumberOfCharactersAttribute)
-        ProbeLog.log("before: value=\(beforeValue.map { "String(\(TextStats($0)))" } ?? "unreadable") selectedRange=\(beforeRange.map { "{\($0.location),\($0.length)}" } ?? "unreadable") AXNumberOfCharacters=\(beforeCount.map(String.init) ?? "unreadable")")
+        AyreLog.log("before: value=\(beforeValue.map { "String(\(TextStats($0)))" } ?? "unreadable") selectedRange=\(beforeRange.map { "{\($0.location),\($0.length)}" } ?? "unreadable") AXNumberOfCharacters=\(beforeCount.map(String.init) ?? "unreadable")")
         if let beforeValue {
             for attribute in ["AXPlaceholderValue", kAXTitleAttribute as String, kAXDescriptionAttribute as String] {
                 let (error, raw) = AX.copy(el, attribute)
                 let label = AX.string(el, attribute)
-                ProbeLog.log("empty diagnostic: \(attribute) read=\(axErrorName(error)) shape=\(AX.describeShape(raw)) valueMatchesLabelOrLabelWithLF=\(label.map { StrictCompare.matchesLabel(beforeValue, label: $0) } ?? false) (a label match alone does not prove the field is empty)")
+                AyreLog.log("empty diagnostic: \(attribute) read=\(axErrorName(error)) shape=\(AX.describeShape(raw)) valueMatchesLabelOrLabelWithLF=\(label.map { StrictCompare.matchesLabel(beforeValue, label: $0) } ?? false) (a label match alone does not prove the field is empty)")
             }
         }
 
@@ -64,7 +64,7 @@ public enum Inserter {
             }
             if method == .codexValue, target.bundleID == InsertionStrategy.codexBundleID {
                 let decision = CodexFieldState.inspect(target)
-                ProbeLog.log("Codex field state=\(decision.rawValue) (determined from descendant editability attributes)")
+                AyreLog.log("Codex field state=\(decision.rawValue) (determined from descendant editability attributes)")
                 guard decision != .unknown else {
                     return .failure(.targetChanged("Write aborted: unknown Codex field structure"))
                 }
@@ -80,7 +80,7 @@ public enum Inserter {
                     return .failure(.targetChanged("Empty-field mode aborted: text must be empty or match the UI label, with selection {0,0}"))
                 }
                 payload = text
-                ProbeLog.log("explicit empty-field mode: inserting only the sample, assuming the user confirmed the field is empty")
+                AyreLog.log("explicit empty-field mode: inserting only the sample, assuming the user confirmed the field is empty")
             } else {
                 payload = expected
             }
@@ -103,20 +103,20 @@ public enum Inserter {
         } else {
             payload = text
         }
-        ProbeLog.log("write method=\(method.rawValue) payload \(TextStats(payload))")
+        AyreLog.log("write method=\(method.rawValue) payload \(TextStats(payload))")
         AXUIElementSetMessagingTimeout(el, 10)
         let start = Date()
         let attribute = method == .selectedText ? kAXSelectedTextAttribute : kAXValueAttribute
         let err = AXUIElementSetAttributeValue(el, attribute as CFString, payload as CFString)
         let elapsed = Date().timeIntervalSince(start)
-        ProbeLog.log("AXUIElementSetAttributeValue(\(method.rawValue)) -> \(axErrorName(err)) in \(String(format: "%.3f", elapsed))s")
+        AyreLog.log("AXUIElementSetAttributeValue(\(method.rawValue)) -> \(axErrorName(err)) in \(String(format: "%.3f", elapsed))s")
         guard err == .success else { return .failure(.writeFailed(err)) }
 
         let verification = verify(el, text: text,
             beforeValue: logicalEmpty ? "" : beforeValue,
             beforeRange: logicalEmpty ? CFRange(location: 0, length: 0) : beforeRange,
             beforeCount: logicalEmpty ? 0 : beforeCount)
-        ProbeLog.log("verification: \(verification)")
+        AyreLog.log("verification: \(verification)")
         if method != .selectedText, let beforeRange {
             restoreCaret(target, expected: payload, offset: (logicalEmpty ? 0 : beforeRange.location) + text.utf16.count)
         }
@@ -131,35 +131,35 @@ public enum Inserter {
               AX.int(el, kAXNumberOfCharactersAttribute) == actual.utf16.count,
               offset >= 0, offset <= actual.utf16.count,
               StrictCompare.equal(actual, expected) || StrictCompare.removedTerminalLineEnding(actual: actual, expected: expected) != nil else {
-            ProbeLog.log("caret restore: SKIPPED (cannot verify text, character count, and focus)")
+            AyreLog.log("caret restore: SKIPPED (cannot verify text, character count, and focus)")
             return
         }
         let (check, settable) = AX.isSettable(el, kAXSelectedTextRangeAttribute)
         guard check == .success, settable else {
-            ProbeLog.log("caret restore: SKIPPED (AXSelectedTextRange is not writable)")
+            AyreLog.log("caret restore: SKIPPED (AXSelectedTextRange is not writable)")
             return
         }
         var range = CFRange(location: offset, length: 0)
         guard let value = AXValueCreate(.cfRange, &range) else { return }
         let error = AXUIElementSetAttributeValue(el, kAXSelectedTextRangeAttribute as CFString, value)
-        ProbeLog.log("caret restore: set {\(offset),0} -> \(axErrorName(error))")
+        AyreLog.log("caret restore: set {\(offset),0} -> \(axErrorName(error))")
         guard error == .success else { return }
         let deadline = Date().addingTimeInterval(1)
         repeat {
             guard case .success = Focus.validateStillFocused(target),
                   let current = AX.string(el, kAXValueAttribute), StrictCompare.equal(current, actual) else {
-                ProbeLog.log("caret restore: UNVERIFIABLE (text or focus changed)")
+                AyreLog.log("caret restore: UNVERIFIABLE (text or focus changed)")
                 return
             }
             if let readback = AX.range(el, kAXSelectedTextRangeAttribute),
                readback.location == offset, readback.length == 0 {
-                ProbeLog.log("caret restore: EXACT {\(offset),0} (text unchanged)")
+                AyreLog.log("caret restore: EXACT {\(offset),0} (text unchanged)")
                 return
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.05))
         } while Date() < deadline
         let readback = AX.range(el, kAXSelectedTextRangeAttribute)
-        ProbeLog.log("caret restore: MISMATCH actual=\(readback.map { "{\($0.location),\($0.length)}" } ?? "unreadable") expected={\(offset),0}")
+        AyreLog.log("caret restore: MISMATCH actual=\(readback.map { "{\($0.location),\($0.length)}" } ?? "unreadable") expected={\(offset),0}")
     }
 
     static func verify(_ el: AXUIElement, text: String, beforeValue: String?, beforeRange: CFRange?, beforeCount: Int?) -> Verification {
@@ -187,7 +187,7 @@ public enum Inserter {
         let afterCount = AX.int(el, kAXNumberOfCharactersAttribute)
         let caretExpected = beforeRange.location + text.utf16.count
         let caretInfo = afterRange.map { "caret={\($0.location),\($0.length)} expected={\(caretExpected),0}" } ?? "caret=unreadable"
-        ProbeLog.log("after: value=String(\(TextStats(after))) AXNumberOfCharacters=\(afterCount.map(String.init) ?? "unreadable") \(caretInfo)")
+        AyreLog.log("after: value=String(\(TextStats(after))) AXNumberOfCharacters=\(afterCount.map(String.init) ?? "unreadable") \(caretInfo)")
 
         if let afterCount, afterCount != after.utf16.count {
             return .unverifiable("AXValue length after insertion (\(after.utf16.count)) differs from AXNumberOfCharacters (\(afterCount)) does not match")
@@ -212,21 +212,21 @@ public enum Inserter {
     }
 }
 
-public enum ProbeEnvironment {
+public enum AyreEnvironment {
     public static func log() {
         let info = Bundle.main.infoDictionary
-        ProbeLog.log("os=\(ProcessInfo.processInfo.operatingSystemVersionString)")
+        AyreLog.log("os=\(ProcessInfo.processInfo.operatingSystemVersionString)")
         #if arch(arm64)
-        ProbeLog.log("arch=arm64")
+        AyreLog.log("arch=arm64")
         #else
-        ProbeLog.log("arch=x86_64")
+        AyreLog.log("arch=x86_64")
         #endif
-        ProbeLog.log("process=\(ProcessInfo.processInfo.processName) bundleID=\(Bundle.main.bundleIdentifier ?? "(unbundled)") version=\(info?["CFBundleShortVersionString"] as? String ?? "-") build=\(info?["CFBundleVersion"] as? String ?? "-")")
-        ProbeLog.log("executable=\(Bundle.main.executablePath ?? CommandLine.arguments[0])")
-        ProbeLog.log("AXIsProcessTrusted=\(AXIsProcessTrusted())")
+        AyreLog.log("process=\(ProcessInfo.processInfo.processName) bundleID=\(Bundle.main.bundleIdentifier ?? "(unbundled)") version=\(info?["CFBundleShortVersionString"] as? String ?? "-") build=\(info?["CFBundleVersion"] as? String ?? "-")")
+        AyreLog.log("executable=\(Bundle.main.executablePath ?? CommandLine.arguments[0])")
+        AyreLog.log("AXIsProcessTrusted=\(AXIsProcessTrusted())")
         if Bundle.main.bundleIdentifier == nil {
-            ProbeLog.log("note: For an unbundled CLI, Accessibility permission is evaluated for the launching terminal app (Terminal/iTerm, etc.).")
+            AyreLog.log("note: For an unbundled CLI, Accessibility permission is evaluated for the launching terminal app (Terminal/iTerm, etc.).")
         }
-        ProbeLog.log("log=\(ProbeLog.logURL.path)")
+        AyreLog.log("log=\(AyreLog.logURL.path)")
     }
 }

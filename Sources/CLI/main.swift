@@ -1,4 +1,4 @@
-import ProbeCore
+import AyreCore
 import AppKit
 import ApplicationServices
 
@@ -30,7 +30,7 @@ func option(_ name: String) -> String? {
 func flag(_ name: String) -> Bool { args.contains(name) }
 
 func fail(_ message: String, code: Int32 = 1) -> Never {
-    ProbeLog.log("FAILED: \(message)")
+    AyreLog.log("FAILED: \(message)")
     exit(code)
 }
 
@@ -47,7 +47,7 @@ func readStandardInput(maxBytes: Int) throws -> Data {
 func waitForUser(seconds: Double) -> pid_t? {
     let startPID = try? Focus.systemWideFocusedApplicationPID().get()
     if let startPID {
-        ProbeLog.log("start focused app: pid=\(startPID) bundleID=\(Focus.appInfo(pid: startPID).bundleID ?? "?")")
+        AyreLog.log("start focused app: pid=\(startPID) bundleID=\(Focus.appInfo(pid: startPID).bundleID ?? "?")")
     }
     var remaining = Int(seconds.rounded(.up))
     while remaining > 0 {
@@ -143,8 +143,8 @@ if command == "put" {
     }
 }
 
-ProbeLog.section("CLI \(args.joined(separator: " "))")
-ProbeEnvironment.log()
+AyreLog.section("CLI \(args.joined(separator: " "))")
+AyreEnvironment.log()
 
 switch command {
 case "env":
@@ -174,19 +174,19 @@ case "request-permission":
 case "inspect":
     let t = captureAfterDelay()
     switch Focus.checkEditable(t) {
-    case .success: ProbeLog.log("editable: yes")
-    case .failure(let e): ProbeLog.log("editable: no — \(e)")
+    case .success: AyreLog.log("editable: yes")
+    case .failure(let e): AyreLog.log("editable: no — \(e)")
     }
 case "insert":
     guard let id = option("--sample"), let sample = SamplePrompts.find(id),
           let requested = InsertionStrategy.parse(option("--method") ?? "auto") else { print(usage); exit(2) }
     let t = captureAfterDelay()
     let method = requested ?? InsertionStrategy.method(for: t)
-    ProbeLog.log("insertion method=\(method.rawValue) (requested=\(option("--method") ?? "auto"))")
+    AyreLog.log("insertion method=\(method.rawValue) (requested=\(option("--method") ?? "auto"))")
     switch Inserter.insert(sample.text, into: t, method: method) {
     case .failure(let e): fail(e.description)
     case .success(let o):
-        ProbeLog.log("RESULT: write=\(axErrorName(o.writeError)) verification=\(o.verification)")
+        AyreLog.log("RESULT: write=\(axErrorName(o.writeError)) verification=\(o.verification)")
         if case .mismatch = o.verification { exit(3) }
     }
 default:

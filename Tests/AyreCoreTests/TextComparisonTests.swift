@@ -1,6 +1,6 @@
 import XCTest
 import ApplicationServices
-@testable import ProbeCore
+@testable import AyreCore
 
 final class TextComparisonTests: XCTestCase {
     func testSnapshotRedactsStringsButDetectsEqualLengthChanges() {

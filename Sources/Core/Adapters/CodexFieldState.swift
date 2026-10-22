@@ -70,14 +70,14 @@ public enum CodexFieldState {
             var count: CFIndex = 0
             let error = AXUIElementGetAttributeValueCount(element, kAXChildrenAttribute as CFString, &count)
             guard error == .success, count >= 0, count <= remaining else {
-                ProbeLog.log("Codex state read: children count error=\(axErrorName(error)) count=\(count) remaining=\(remaining)")
+                AyreLog.log("Codex state read: children count error=\(axErrorName(error)) count=\(count) remaining=\(remaining)")
                 return nil
             }
             if count == 0 { return [] }
             var array: CFArray?
             let readError = AXUIElementCopyAttributeValues(element, kAXChildrenAttribute as CFString, 0, count, &array)
             guard readError == .success, let elements = array as? [AXUIElement], elements.count == count else {
-                ProbeLog.log("Codex state read: children array error=\(axErrorName(readError)) shape=\(AX.describeShape(array))")
+                AyreLog.log("Codex state read: children array error=\(axErrorName(readError)) shape=\(AX.describeShape(array))")
                 return nil
             }
             return elements
@@ -87,7 +87,7 @@ public enum CodexFieldState {
             guard remaining > 0, depth <= 6, Date() < deadline,
                   AX.pid(element) == target.pid,
                   !visited.contains(where: { CFEqual($0, element) }) else {
-                ProbeLog.log("Codex state read: node rejected depth=\(depth) remaining=\(remaining) pid=\(AX.pid(element).map(String.init) ?? "unreadable")")
+                AyreLog.log("Codex state read: node rejected depth=\(depth) remaining=\(remaining) pid=\(AX.pid(element).map(String.init) ?? "unreadable")")
                 return nil
             }
             remaining -= 1
@@ -96,29 +96,29 @@ public enum CodexFieldState {
             guard let role = AX.string(element, kAXRoleAttribute),
                   role == kAXGroupRole as String || role == kAXStaticTextRole as String,
                   let value = AX.string(element, kAXValueAttribute) else {
-                ProbeLog.log("Codex state read: role/value unreadable or unsupported depth=\(depth)")
+                AyreLog.log("Codex state read: role/value unreadable or unsupported depth=\(depth)")
                 return nil
             }
             let (valueError, valueSettable) = AX.isSettable(element, kAXValueAttribute)
             let (selectionError, selectionSettable) = AX.isSettable(element, kAXSelectedTextAttribute)
             guard valueError == .success, selectionError == .success else {
-                ProbeLog.log("Codex state read: settable errors value=\(axErrorName(valueError)) selection=\(axErrorName(selectionError)) depth=\(depth)")
+                AyreLog.log("Codex state read: settable errors value=\(axErrorName(valueError)) selection=\(axErrorName(selectionError)) depth=\(depth)")
                 return nil
             }
             var rawNames: CFArray?
             let namesError = AXUIElementCopyAttributeNames(element, &rawNames)
             guard namesError == .success, let names = rawNames as? [String] else {
-                ProbeLog.log("Codex state read: attribute list error=\(axErrorName(namesError)) depth=\(depth)")
+                AyreLog.log("Codex state read: attribute list error=\(axErrorName(namesError)) depth=\(depth)")
                 return nil
             }
             let listed = names.contains("AXEditableAncestor")
             let (ancestorError, ancestor) = listed ? AX.element(element, "AXEditableAncestor") : (.attributeUnsupported, nil)
             guard let isRoot = ancestorState(listed: listed, error: ancestorError,
                 matchesRoot: ancestor.map { CFEqual($0, root) } ?? false) else {
-                ProbeLog.log("Codex state read: ancestor error=\(axErrorName(ancestorError)) matchesRoot=false depth=\(depth)")
+                AyreLog.log("Codex state read: ancestor error=\(axErrorName(ancestorError)) matchesRoot=false depth=\(depth)")
                 return nil
             }
-            ProbeLog.log("Codex state node: depth=\(depth) role=\(role) valueUTF16=\(value.utf16.count) valueSettable=\(valueSettable) selectionSettable=\(selectionSettable) ancestorListed=\(listed) ancestorIsRoot=\(isRoot)")
+            AyreLog.log("Codex state node: depth=\(depth) role=\(role) valueUTF16=\(value.utf16.count) valueSettable=\(valueSettable) selectionSettable=\(selectionSettable) ancestorListed=\(listed) ancestorIsRoot=\(isRoot)")
             guard let elements = childrenOf(element) else { return nil }
             var nodes: [Node] = []
             for child in elements {
@@ -132,7 +132,7 @@ public enum CodexFieldState {
               AX.int(root, kAXNumberOfCharactersAttribute) == value.utf16.count,
               let range = AX.range(root, kAXSelectedTextRangeAttribute),
               let elements = childrenOf(root) else {
-            ProbeLog.log("Codex state read: root value/count/range/children unavailable")
+            AyreLog.log("Codex state read: root value/count/range/children unavailable")
             return .unknown
         }
         let title = AX.string(root, kAXTitleAttribute)
@@ -146,7 +146,7 @@ public enum CodexFieldState {
               let current = AX.string(root, kAXValueAttribute), StrictCompare.equal(current, value),
               let currentRange = AX.range(root, kAXSelectedTextRangeAttribute),
               currentRange.location == range.location, currentRange.length == range.length else {
-            ProbeLog.log("Codex state read: end-of-capture state/focus changed or deadline exceeded")
+            AyreLog.log("Codex state read: end-of-capture state/focus changed or deadline exceeded")
             return .unknown
         }
         return evaluate(value: value, title: title, description: description, range: range, children: nodes)

@@ -1,16 +1,16 @@
 import Foundation
 
 /// Diagnostic log. Never pass the user's existing field content here; log lengths only.
-public enum ProbeLog {
+public enum AyreLog {
     public static let logURL: URL = {
         let dir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Logs/PromptInsertProbe", isDirectory: true)
+            .appendingPathComponent("Library/Logs/Ayre", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("probe.log")
+        return dir.appendingPathComponent("ayre.log")
     }()
 
     public static var echoToStderr = true
-    private static let queue = DispatchQueue(label: "PromptInsertProbe.log")
+    private static let queue = DispatchQueue(label: "Ayre.log")
     private static let formatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

@@ -57,7 +57,7 @@ public enum EmptyFieldDiagnostic {
 
     public static func capture(_ target: FocusTarget) -> [String: String]? {
         guard case .success = Focus.validateStillFocused(target) else {
-            ProbeLog.log("[empty comparison] ABORT: Cannot verify target focus")
+            AyreLog.log("[empty comparison] ABORT: Cannot verify target focus")
             return nil
         }
         let el = target.element
@@ -155,17 +155,17 @@ public enum EmptyFieldDiagnostic {
               let before, let after = AX.string(el, kAXValueAttribute), StrictCompare.equal(before, after),
               let selection, let afterSelection = AX.range(el, kAXSelectedTextRangeAttribute),
               selection.location == afterSelection.location, selection.length == afterSelection.length else {
-            ProbeLog.log("[empty comparison] ABORT: Text, selection, or focus changed or became unreadable during diagnostics")
+            AyreLog.log("[empty comparison] ABORT: Text, selection, or focus changed or became unreadable during diagnostics")
             return nil
         }
-        for key in result.keys.sorted() { ProbeLog.log("[empty comparison] \(key): \(result[key]!)") }
+        for key in result.keys.sorted() { AyreLog.log("[empty comparison] \(key): \(result[key]!)") }
         save(result, target: target)
-        ProbeLog.log("[empty comparison] read-only snapshot complete (text and selection unchanged)")
+        AyreLog.log("[empty comparison] read-only snapshot complete (text and selection unchanged)")
         return result
     }
 
     private static func save(_ values: [String: String], target: FocusTarget) {
-        let folder = ProbeLog.logURL.deletingLastPathComponent().appendingPathComponent("snapshots", isDirectory: true)
+        let folder = AyreLog.logURL.deletingLastPathComponent().appendingPathComponent("snapshots", isDirectory: true)
         let url = folder.appendingPathComponent("snapshot-\(UUID().uuidString).json")
         let document: [String: Any] = ["capturedAt": ISO8601DateFormatter().string(from: Date()),
             "pid": target.pid, "bundleID": target.bundleID ?? "unknown", "attributes": values,
@@ -173,9 +173,9 @@ public enum EmptyFieldDiagnostic {
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try JSONSerialization.data(withJSONObject: document, options: [.prettyPrinted, .sortedKeys]).write(to: url, options: .atomic)
-            ProbeLog.log("[empty comparison] snapshot saved: \(url.path)")
+            AyreLog.log("[empty comparison] snapshot saved: \(url.path)")
         } catch {
-            ProbeLog.log("[empty comparison] snapshot save failed: \(error.localizedDescription)")
+            AyreLog.log("[empty comparison] snapshot save failed: \(error.localizedDescription)")
         }
     }
 

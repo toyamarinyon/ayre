@@ -28,5 +28,5 @@ for app in /Applications/Ayre.app build/DerivedData/Build/Products/Release/Ayre.
 done
 echo "## Spotlight process"
 pgrep -lf Spotlight | head -3
-echo "## probe.log (last 300 lines)"
-tail -n 300 ~/Library/Logs/PromptInsertProbe/probe.log 2>/dev/null || echo "(no log)"
+echo "## ayre.log (last 300 lines)"
+tail -n 300 ~/Library/Logs/Ayre/ayre.log 2>/dev/null || echo "(no log)"

@@ -53,16 +53,16 @@ struct InsertPromptIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        ProbeLog.section("Intent perform (prompt=\(prompt.id))")
-        ProbeEnvironment.log()
+        AyreLog.section("Intent perform (prompt=\(prompt.id))")
+        AyreEnvironment.log()
         let text: String
         do {
             text = try PromptStore().text(prompt.id)
         } catch {
-            ProbeLog.log("[perform] ABORT: \(error)")
+            AyreLog.log("[perform] ABORT: \(error)")
             throw IntentFailure(reason: "\(error)")
         }
-        ProbeLog.log("[perform] prompt=\(prompt.id) \(TextStats(text))")
+        AyreLog.log("[perform] prompt=\(prompt.id) \(TextStats(text))")
         let target = try IntentTargetResolver.resolveAtPerform()
         IntentTargetResolver.insertAfterSpotlightCloses(text: text, target: target)
         return .result()
@@ -77,21 +77,21 @@ struct InsertLatestPromptIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        ProbeLog.section("Intent perform (latest prompt)")
-        ProbeEnvironment.log()
+        AyreLog.section("Intent perform (latest prompt)")
+        AyreEnvironment.log()
         let store = PromptStore()
         guard let latest = store.list().prompts.first else {
-            ProbeLog.log("[perform] ABORT: No readable saved prompts found")
+            AyreLog.log("[perform] ABORT: No readable saved prompts found")
             throw IntentFailure(reason: "No readable saved prompts found")
         }
         let text: String
         do {
             text = try store.text(latest.slug)
         } catch {
-            ProbeLog.log("[perform] ABORT: \(error)")
+            AyreLog.log("[perform] ABORT: \(error)")
             throw IntentFailure(reason: "\(error)")
         }
-        ProbeLog.log("[perform] latest prompt=\(latest.slug) modified=\(latest.modified) \(TextStats(text))")
+        AyreLog.log("[perform] latest prompt=\(latest.slug) modified=\(latest.modified) \(TextStats(text))")
         let target = try IntentTargetResolver.resolveAtPerform()
         IntentTargetResolver.insertAfterSpotlightCloses(text: text, target: target)
         return .result()
@@ -105,37 +105,37 @@ enum IntentTargetResolver {
     /// attribute to the original field), fail instead of guessing.
     @MainActor
     static func resolveAtPerform() throws -> FocusTarget {
-        guard AXIsProcessTrusted() else { throw IntentFailure(reason: ProbeError.notTrusted.description) }
+        guard AXIsProcessTrusted() else { throw IntentFailure(reason: AyreError.notTrusted.description) }
         let front = NSWorkspace.shared.frontmostApplication
-        ProbeLog.log("[perform] NSWorkspace.frontmost=\(front?.bundleIdentifier ?? "?") pid=\(front?.processIdentifier ?? -1)")
+        AyreLog.log("[perform] NSWorkspace.frontmost=\(front?.bundleIdentifier ?? "?") pid=\(front?.processIdentifier ?? -1)")
 
         var candidates: [FocusTarget] = []
         if case .success(let t) = Focus.captureFocusedTarget(enableElectronAX: true, retry: 0.3) {
-            ProbeLog.log("[perform] AX focused: \(t.summary)")
+            AyreLog.log("[perform] AX focused: \(t.summary)")
             candidates.append(t)
         }
         if let front, front.processIdentifier != getpid(), !invokerBundleIDs.contains(front.bundleIdentifier ?? "") {
             Focus.enableManualAccessibility(pid: front.processIdentifier)
             let (err, el) = Focus.appFocusedElement(pid: front.processIdentifier)
-            ProbeLog.log("[perform] frontmost app AXFocusedUIElement -> \(axErrorName(err))")
+            AyreLog.log("[perform] frontmost app AXFocusedUIElement -> \(axErrorName(err))")
             if let el, let t = Focus.makeTarget(el, source: "NSWorkspace.frontmost.AXFocusedUIElement") {
-                ProbeLog.log("[perform] frontmost focused: \(t.summary)")
+                AyreLog.log("[perform] frontmost focused: \(t.summary)")
                 candidates.append(t)
             }
         }
         for t in candidates {
             if t.pid == getpid() || invokerBundleIDs.contains(t.bundleID ?? "") {
-                ProbeLog.log("[perform] reject \(t.source): invoker/self")
+                AyreLog.log("[perform] reject \(t.source): invoker/self")
                 continue
             }
             if case .failure(let e) = Focus.checkEditable(t) {
-                ProbeLog.log("[perform] reject \(t.source): \(e)")
+                AyreLog.log("[perform] reject \(t.source): \(e)")
                 continue
             }
             Focus.logReport(t)
             return t
         }
-        ProbeLog.log("[perform] ABORT: Cannot identify the original text field")
+        AyreLog.log("[perform] ABORT: Cannot identify the original text field")
         throw IntentFailure(reason: "Cannot identify the original text field; focus may still be on Spotlight. Check the log.")
     }
 
@@ -148,17 +148,17 @@ enum IntentTargetResolver {
             let pid = try? Focus.systemWideFocusedApplicationPID().get()
             let elapsed = Date().timeIntervalSince(start)
             if pid == target.pid {
-                ProbeLog.log("[deferred] focus returned to target app after \(String(format: "%.2f", elapsed))s")
+                AyreLog.log("[deferred] focus returned to target app after \(String(format: "%.2f", elapsed))s")
                 switch Focus.validateStillFocused(target) {
                 case .failure(let e):
-                    ProbeLog.log("[deferred] ABORT (nothing written): \(e)")
+                    AyreLog.log("[deferred] ABORT (nothing written): \(e)")
                     NSSound.beep()
                 case .success:
                     let method = InsertionStrategy.method(for: target)
-                    ProbeLog.log("[deferred] insertion method=\(method.rawValue)")
+                    AyreLog.log("[deferred] insertion method=\(method.rawValue)")
                     switch Inserter.insert(text, into: target, method: method) {
-                    case .failure(let e): ProbeLog.log("[deferred] RESULT: failed \(e)"); NSSound.beep()
-                    case .success(let o): ProbeLog.log("[deferred] RESULT: write=\(axErrorName(o.writeError)) verification=\(o.verification)")
+                    case .failure(let e): AyreLog.log("[deferred] RESULT: failed \(e)"); NSSound.beep()
+                    case .success(let o): AyreLog.log("[deferred] RESULT: write=\(axErrorName(o.writeError)) verification=\(o.verification)")
                     }
                 }
                 IntentInsertionActivity.end()
@@ -166,7 +166,7 @@ enum IntentTargetResolver {
             }
             if elapsed > 5 {
                 let bid = pid.flatMap { Focus.appInfo(pid: $0).bundleID } ?? "?"
-                ProbeLog.log("[deferred] ABORT: Focus did not return to the target app within 5 seconds (current pid=\(pid.map(String.init) ?? "?") \(bid))")
+                AyreLog.log("[deferred] ABORT: Focus did not return to the target app within 5 seconds (current pid=\(pid.map(String.init) ?? "?") \(bid))")
                 NSSound.beep()
                 IntentInsertionActivity.end()
                 return
@@ -183,7 +183,7 @@ enum IntentTargetResolver {
     }
 }
 
-struct ProbeShortcuts: AppShortcutsProvider {
+struct AyreShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: InsertLatestPromptIntent(),

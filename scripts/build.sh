@@ -56,7 +56,7 @@ case "$mode" in
     xcode_args+=(CODE_SIGNING_ALLOWED=YES CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="$team" CODE_SIGN_IDENTITY="$identity" CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO)
     ;;
 esac
-xcodebuild -project PromptInsertProbe.xcodeproj -scheme PromptInsertProbe -configuration "$configuration" \
+xcodebuild -project Ayre.xcodeproj -scheme Ayre -configuration "$configuration" \
   -derivedDataPath "$derived_data" "${xcode_args[@]}" clean build
 app="$derived_data/Build/Products/$configuration/Ayre.app"
 # Resolve the exact certificate selected by Xcode, without reading private key material.
@@ -97,5 +97,5 @@ if $universal; then
   done
 fi
 "$app/Contents/MacOS/ayre" capabilities --json
-printf '\nApp: %s\nReceiver: %s\nSigning mode: %s\n' "$app" "$bin_dir/PromptInsertProbeReceiver" "$mode"
+printf '\nApp: %s\nReceiver: %s\nSigning mode: %s\n' "$app" "$bin_dir/AyreReceiver" "$mode"
 echo 'Install or register this app with Launch Services before testing discovery/App Intents. See README.md.'

@@ -1,7 +1,7 @@
 import AppKit
 import ApplicationServices
 
-public enum ProbeError: Error, CustomStringConvertible {
+public enum AyreError: Error, CustomStringConvertible {
     case notTrusted
     case noFocusedApplication(AXError)
     case noFocusedElement(AXError)
@@ -68,7 +68,7 @@ public enum Focus {
         return (app?.bundleIdentifier, app?.localizedName)
     }
 
-    public static func systemWideFocusedApplicationPID() -> Result<pid_t, ProbeError> {
+    public static func systemWideFocusedApplicationPID() -> Result<pid_t, AyreError> {
         let (err, app) = AX.element(AXUIElementCreateSystemWide(), kAXFocusedApplicationAttribute)
         guard let app, let pid = AX.pid(app) else { return .failure(.noFocusedApplication(err)) }
         return .success(pid)
@@ -88,7 +88,7 @@ public enum Focus {
     public static func enableManualAccessibility(pid: pid_t) -> AXError {
         let app = AXUIElementCreateApplication(pid)
         let err = AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue)
-        ProbeLog.log("AXManualAccessibility=true pid=\(pid) -> \(axErrorName(err))")
+        AyreLog.log("AXManualAccessibility=true pid=\(pid) -> \(axErrorName(err))")
         return err
     }
 
@@ -104,7 +104,7 @@ public enum Focus {
 
     /// Captures the element that currently has keyboard focus, according to the AX system-wide element.
     /// Falls back to the focused app's own focused element (AXFocusedUIElement on the app) and records which one was used.
-    public static func captureFocusedTarget(enableElectronAX: Bool, retry: TimeInterval = 1.0) -> Result<FocusTarget, ProbeError> {
+    public static func captureFocusedTarget(enableElectronAX: Bool, retry: TimeInterval = 1.0) -> Result<FocusTarget, AyreError> {
         guard AXIsProcessTrusted() else { return .failure(.notTrusted) }
         let pid: pid_t
         switch systemWideFocusedApplicationPID() {
@@ -112,7 +112,7 @@ public enum Focus {
         case .failure(let e): return .failure(e)
         }
         let info = appInfo(pid: pid)
-        ProbeLog.log("focused application: pid=\(pid) bundleID=\(info.bundleID ?? "?") name=\(info.name ?? "?")")
+        AyreLog.log("focused application: pid=\(pid) bundleID=\(info.bundleID ?? "?") name=\(info.name ?? "?")")
         if enableElectronAX { enableManualAccessibility(pid: pid) }
 
         let deadline = Date().addingTimeInterval(retry)
@@ -121,7 +121,7 @@ public enum Focus {
             let (swErr, sw) = systemWideFocusedElement()
             let (appErr, appEl) = appFocusedElement(pid: pid)
             if let sw, let appEl {
-                ProbeLog.log("systemWide focused == app focused: \(CFEqual(sw, appEl))")
+                AyreLog.log("systemWide focused == app focused: \(CFEqual(sw, appEl))")
             }
             if let sw, AX.pid(sw) == pid, let t = makeTarget(sw, source: "systemWide.AXFocusedUIElement") { return .success(t) }
             if let appEl, let t = makeTarget(appEl, source: "app.AXFocusedUIElement") { return .success(t) }
@@ -133,23 +133,23 @@ public enum Focus {
 
     public static func logReport(_ target: FocusTarget) {
         let el = target.element
-        ProbeLog.log("target: \(target.summary)")
-        ProbeLog.log("attributes: \(AX.attributeNames(el).joined(separator: ","))")
-        ProbeLog.log("parameterized attributes: \(AX.parameterizedAttributeNames(el).joined(separator: ","))")
+        AyreLog.log("target: \(target.summary)")
+        AyreLog.log("attributes: \(AX.attributeNames(el).joined(separator: ","))")
+        AyreLog.log("parameterized attributes: \(AX.parameterizedAttributeNames(el).joined(separator: ","))")
         for attr in keyAttributes {
             let (readErr, value) = AX.copy(el, attr)
             let (setErr, settable) = AX.isSettable(el, attr)
-            ProbeLog.log("  \(attr): read=\(axErrorName(readErr)) shape=\(AX.describeShape(value)) settable=\(settable) (\(axErrorName(setErr)))")
+            AyreLog.log("  \(attr): read=\(axErrorName(readErr)) shape=\(AX.describeShape(value)) settable=\(settable) (\(axErrorName(setErr)))")
         }
         for attr in labelAttributes {
             if let s = AX.string(el, attr), !s.isEmpty {
-                ProbeLog.log("  label \(attr)=\"\(s.prefix(80))\"")
+                AyreLog.log("  label \(attr)=\"\(s.prefix(80))\"")
             }
         }
     }
 
     /// Editable = text role, not secure, and AXSelectedText is actually settable (existence is not enough).
-    public static func checkEditable(_ target: FocusTarget) -> Result<Void, ProbeError> {
+    public static func checkEditable(_ target: FocusTarget) -> Result<Void, AyreError> {
         let el = target.element
         let (roleErr, roleValue) = AX.copy(el, kAXRoleAttribute)
         guard roleErr == .success, roleValue != nil else {
@@ -170,7 +170,7 @@ public enum Focus {
     }
 
     /// The target is still valid only if it still exists and is still the focused element of the focused app.
-    public static func validateStillFocused(_ target: FocusTarget) -> Result<Void, ProbeError> {
+    public static func validateStillFocused(_ target: FocusTarget) -> Result<Void, AyreError> {
         switch systemWideFocusedApplicationPID() {
         case .failure(let e): return .failure(.targetChanged("Cannot get the focused app: \(e)"))
         case .success(let pid) where pid != target.pid:

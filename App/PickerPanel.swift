@@ -48,7 +48,7 @@ final class PickerController: NSObject, NSWindowDelegate, NSTableViewDataSource,
     func hotKeyPressed() {
         guard panel == nil, !isInserting else { return }
         target = nil
-        ProbeLog.section("Picker")
+        AyreLog.section("Picker")
         // Captured before any UI of ours is shown, so focus still belongs to the original app.
         var errorText: String?
         switch Focus.captureFocusedTarget(enableElectronAX: true) {
@@ -64,12 +64,12 @@ final class PickerController: NSObject, NSWindowDelegate, NSTableViewDataSource,
                 target = t
             }
         }
-        if let errorText { ProbeLog.log("capture failed: \(errorText)") }
+        if let errorText { AyreLog.log("capture failed: \(errorText)") }
         let listed = store.list()
         skippedCount = listed.skipped
         all = listed.prompts
         shown = all
-        ProbeLog.log("prompts=\(all.count) skipped=\(listed.skipped)")
+        AyreLog.log("prompts=\(all.count) skipped=\(listed.skipped)")
         show(errorText: errorText, skipped: listed.skipped)
     }
 
@@ -196,7 +196,7 @@ final class PickerController: NSObject, NSWindowDelegate, NSTableViewDataSource,
             let (_, el) = Focus.appFocusedElement(pid: target.pid)
             sameElement = el.map { CFEqual($0, target.element) ? "true" : "false" } ?? "nil"
         }
-        ProbeLog.log("[\(label)] AX focused app pid=\(pid.map(String.init) ?? "?") (\(pid.flatMap { Focus.appInfo(pid: $0).bundleID } ?? "?")) NSWorkspace.frontmost=\(front?.bundleIdentifier ?? "?") originalApp.AXFocusedUIElement==target: \(sameElement) NSApp.isActive=\(NSApp.isActive)")
+        AyreLog.log("[\(label)] AX focused app pid=\(pid.map(String.init) ?? "?") (\(pid.flatMap { Focus.appInfo(pid: $0).bundleID } ?? "?")) NSWorkspace.frontmost=\(front?.bundleIdentifier ?? "?") originalApp.AXFocusedUIElement==target: \(sameElement) NSApp.isActive=\(NSApp.isActive)")
     }
 
     @objc private func insertSelected() {
@@ -206,12 +206,12 @@ final class PickerController: NSObject, NSWindowDelegate, NSTableViewDataSource,
         do {
             text = try store.text(prompt.slug)
         } catch {
-            ProbeLog.log("ABORT (nothing written): \(error)")
+            AyreLog.log("ABORT (nothing written): \(error)")
             footer.stringValue = "Cannot read: \(error)"
             NSSound.beep()
             return
         }
-        ProbeLog.log("selected prompt=\(prompt.slug) \(TextStats(text))")
+        AyreLog.log("selected prompt=\(prompt.slug) \(TextStats(text))")
         logFocusState("before close")
         isInserting = true
         close()
@@ -223,17 +223,17 @@ final class PickerController: NSObject, NSWindowDelegate, NSTableViewDataSource,
             self?.logFocusState("after close")
             switch Focus.validateStillFocused(target) {
             case .failure(let e):
-                ProbeLog.log("ABORT (nothing written): \(e)")
+                AyreLog.log("ABORT (nothing written): \(e)")
                 NSSound.beep()
             case .success:
                 let method = InsertionStrategy.method(for: target)
-                ProbeLog.log("insertion method=\(method.rawValue)")
+                AyreLog.log("insertion method=\(method.rawValue)")
                 switch Inserter.insert(text, into: target, method: method) {
                 case .failure(let e):
-                    ProbeLog.log("RESULT: failed \(e)")
+                    AyreLog.log("RESULT: failed \(e)")
                     NSSound.beep()
                 case .success(let o):
-                    ProbeLog.log("RESULT: write=\(axErrorName(o.writeError)) verification=\(o.verification)")
+                    AyreLog.log("RESULT: write=\(axErrorName(o.writeError)) verification=\(o.verification)")
                 }
             }
         }
@@ -253,7 +253,7 @@ final class PickerController: NSObject, NSWindowDelegate, NSTableViewDataSource,
     }
 
     @objc func cancel() {
-        ProbeLog.log("cancelled")
+        AyreLog.log("cancelled")
         close()
         target = nil
     }

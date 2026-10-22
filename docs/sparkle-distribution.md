@@ -9,8 +9,8 @@ Apple signing uses the existing five Actions secrets listed in README. Sparkle n
 Resolve the pinned tools, then create an Ayre-specific key in your login Keychain:
 
 ```sh
-xcodebuild -resolvePackageDependencies -project PromptInsertProbe.xcodeproj \
-  -scheme PromptInsertProbe -derivedDataPath build/DerivedData
+xcodebuild -resolvePackageDependencies -project Ayre.xcodeproj \
+  -scheme Ayre -derivedDataPath build/DerivedData
 sparkle_bin=build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin
 "$sparkle_bin/generate_keys" --account ayre
 ```

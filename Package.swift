@@ -2,16 +2,16 @@
 import PackageDescription
 
 let package = Package(
-    name: "PromptInsertProbe",
+    name: "Ayre",
     platforms: [.macOS(.v14)],
     products: [
-        .executable(name: "ayre", targets: ["PromptInsertProbeCLI"]),
-        .executable(name: "PromptInsertProbeReceiver", targets: ["PromptInsertProbeReceiver"]),
+        .executable(name: "ayre", targets: ["AyreCLI"]),
+        .executable(name: "AyreReceiver", targets: ["AyreReceiver"]),
     ],
     targets: [
-        .target(name: "ProbeCore", path: "Sources/Core"),
-        .executableTarget(name: "PromptInsertProbeCLI", dependencies: ["ProbeCore"], path: "Sources/CLI"),
-        .executableTarget(name: "PromptInsertProbeReceiver", dependencies: ["ProbeCore"], path: "Sources/Receiver"),
-        .testTarget(name: "ProbeCoreTests", dependencies: ["ProbeCore"], path: "Tests/ProbeCoreTests"),
+        .target(name: "AyreCore", path: "Sources/Core"),
+        .executableTarget(name: "AyreCLI", dependencies: ["AyreCore"], path: "Sources/CLI"),
+        .executableTarget(name: "AyreReceiver", dependencies: ["AyreCore"], path: "Sources/Receiver"),
+        .testTarget(name: "AyreCoreTests", dependencies: ["AyreCore"], path: "Tests/AyreCoreTests"),
     ]
 )
