@@ -1,13 +1,17 @@
 ---
 name: handoff-codex
-description: Turn an implementation discussion into a self-contained Codex handoff prompt and save it to Ayre when the user wants to move implementation from Claude Code to Codex without exposing the source session or investigation directories.
+description: Create and save an actionable handoff for Codex to carry out the next agreed work from a Claude Code conversation, without requiring access to the source session or investigation directories.
 ---
 
-Prepare an implementation handoff from this conversation to a separate Codex session, then register it with Ayre. The source discussion may run in Claude Code on Bedrock and involve restricted information. The destination must be able to work from the handoff and its explicitly authorized implementation repository, without reading the source session, research workspace, or worktree. Do not start or message Codex, perform the implementation, insert text, or submit a message as part of this skill.
+Create a handoff that enables a separate Codex session to carry out the next work agreed in this conversation, then register it with Ayre. The deliverable is an execution prompt centered on what Codex should achieve next; extracting information and summarizing the discussion are supporting steps, not the goal. The source discussion may run in Claude Code on Bedrock and involve restricted information. The destination must be able to work from the handoff and its explicitly authorized implementation repository, without reading the source session, research workspace, or worktree. Do not start or message Codex, perform the implementation, insert text, or submit a message as part of this skill.
 
-## Gather the minimum transferable context
+## Define the next work for Codex
 
-Use the current conversation and already available evidence. Extract the intended outcome, agreed design, relevant current behavior, constraints, decisions and rationale, implementation starting state, tests already performed, known failures, remaining work, and acceptance criteria. Distinguish verified facts, user decisions, assumptions, and unverified suggestions. Summarize decisions rather than reproducing the transcript or raw investigation output.
+Start by identifying the work the user wants Codex to perform next and the result that will count as completion. Use the latest user direction and agreed next steps to distinguish pending work from completed investigation, abandoned ideas, and background discussion. Do not hand off every topic mentioned or reopen settled decisions. If the next assignment itself is materially ambiguous, ask a focused question; do not invent a task merely to produce a handoff.
+
+Translate the agreed next work into an actionable assignment: what Codex should change or produce, where it should start, which decisions are already settled, what remains for it to decide, and how it should verify completion. Preserve the user's actual scope rather than turning an implementation assignment into another research or planning exercise.
+
+Then gather only the transferable context needed to execute that assignment from the current conversation and already available evidence: relevant current behavior, contracts, agreed design and rationale, constraints, starting state, prior test results, known failures, and prerequisites. Distinguish verified facts, user decisions, assumptions, and unverified suggestions. Include a detail because it enables action, judgment, or validation; omit discussion history that serves none of these purposes.
 
 Identify the destination implementation repository and working directory separately from the source workspace. Include the destination URL/path, branch or base commit, and worktree instructions only when known and authorized. Do not assume Claude Code's current directory is the Codex implementation directory. If that destination or another prerequisite is missing and prevents an actionable handoff, ask a focused question before saving. Do not invent a path, commit, repository, or completed test.
 
@@ -31,7 +35,7 @@ Make the prompt directly actionable and self-contained. Use the following conten
 - **Goal and completion criteria:** the user-visible result, in-scope deliverables, explicit non-goals, and observable acceptance checks.
 - **Authorized workspace and starting state:** the destination repository/directory/ref and relevant destination files. Source-session and investigation directories are out of bounds, including for subagents. Read applicable instructions in the authorized destination only.
 - **Context and decisions:** current architecture, relevant contracts/interfaces and dependencies, chosen approach and tradeoffs, rejected approaches only when they prevent a known trap. Include safe examples/specifications that would otherwise require source-only context.
-- **Implementation and validation:** remaining work, meaningful automated checks, existing evidence versus still-unverified behavior, manual/environment prerequisites, and any actual limits on committing, pushing, deployment, or external actions. Do not turn an implementation handoff into authorization to publish, access secrets, or message others.
+- **Implementation and validation:** concrete next actions and deliverables for Codex, meaningful automated checks, existing evidence versus still-unverified behavior, manual/environment prerequisites, and any actual limits on committing, pushing, deployment, or external actions. Do not turn an implementation handoff into authorization to publish, access secrets, or message others.
 - **Coordination and escalation:** include the delegation requirements below and concrete known questions/blockers. Never use “as discussed,” “see the previous session,” or source-only references as a substitute for necessary context.
 
 Include these destination-agent instructions, adapted to the available tools without weakening their intent:
@@ -42,7 +46,7 @@ Include these destination-agent instructions, adapted to the available tools wit
 >
 > Progress autonomously on routine reversible work within the authorized scope. Consult the user when a difficult tradeoff materially changes the goal, a consequential decision lacks authorization, or investigation reaches a dead end. Explain the evidence, options, and a recommendation; continue independent work where possible. Do not repeatedly spin or conceal uncertainty. The main agent owns goal completion, integration, and truthful reporting of tests and remaining limitations. It's a lonely load. But you (we) are not alone.
 
-Before saving, check the prompt as if Codex has only this text and the authorized destination repository. Remove unsafe source details and resolve essential missing facts. Do not promise that a prompt instruction itself enforces filesystem isolation; actual Codex workspace permissions must also exclude the source workspace.
+Before saving, check the prompt as if Codex has only this text and the authorized destination repository: can it identify the next assignment, begin meaningful work, make the remaining authorized decisions, and tell when the goal is achieved? A conversation summary or a list of extracted facts alone is not a completed handoff. Remove unsafe source details and resolve essential missing facts. Do not promise that a prompt instruction itself enforces filesystem isolation; actual Codex workspace permissions must also exclude the source workspace.
 
 ## Save with the shared Ayre helper
 
