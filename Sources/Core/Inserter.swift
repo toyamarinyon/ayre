@@ -31,7 +31,7 @@ public enum Inserter {
         case codexValue = "AXValue (Codex automatic empty-field detection)"
     }
 
-    public static func insert(_ text: String, into target: FocusTarget, method: Method = .selectedText) -> Result<InsertOutcome, AyreError> {
+    public static func insert(_ text: String, into target: FocusTarget, method: Method = .selectedText, requireFocused: Bool = true) -> Result<InsertOutcome, AyreError> {
         if case .failure(let e) = Focus.checkEditable(target) { return .failure(e) }
         let el = target.element
         AyreLog.log("insert: text \(TextStats(text))")
@@ -84,8 +84,8 @@ public enum Inserter {
             } else {
                 payload = expected
             }
-            // Recheck the snapshot and focus immediately before replacing the whole value.
-            if case .failure(let error) = Focus.validateStillFocused(target) { return .failure(error) }
+            // Recheck the snapshot and target validity before replacing the whole value.
+            if case .failure(let error) = validate(target, requireFocused: requireFocused) { return .failure(error) }
             guard let current = AX.string(el, kAXValueAttribute), StrictCompare.equal(current, beforeValue),
                   let currentRange = AX.range(el, kAXSelectedTextRangeAttribute),
                   currentRange.location == beforeRange.location, currentRange.length == beforeRange.length,
@@ -106,6 +106,7 @@ public enum Inserter {
         AyreLog.log("write method=\(method.rawValue) payload \(TextStats(payload))")
         AXUIElementSetMessagingTimeout(el, 10)
         let start = Date()
+        if case .failure(let error) = validate(target, requireFocused: requireFocused) { return .failure(error) }
         let attribute = method == .selectedText ? kAXSelectedTextAttribute : kAXValueAttribute
         let err = AXUIElementSetAttributeValue(el, attribute as CFString, payload as CFString)
         let elapsed = Date().timeIntervalSince(start)
@@ -118,20 +119,24 @@ public enum Inserter {
             beforeCount: logicalEmpty ? 0 : beforeCount)
         AyreLog.log("verification: \(verification)")
         if method != .selectedText, let beforeRange {
-            restoreCaret(target, expected: payload, offset: (logicalEmpty ? 0 : beforeRange.location) + text.utf16.count)
+            restoreCaret(target, requireFocused: requireFocused, expected: payload, offset: (logicalEmpty ? 0 : beforeRange.location) + text.utf16.count)
         }
         return .success(InsertOutcome(writeError: err, elapsed: elapsed, verification: verification))
     }
 
-    private static func restoreCaret(_ target: FocusTarget, expected: String, offset: Int) {
+    private static func validate(_ target: FocusTarget, requireFocused: Bool) -> Result<Void, AyreError> {
+        requireFocused ? Focus.validateStillFocused(target) : Focus.validateTargetExists(target)
+    }
+
+    private static func restoreCaret(_ target: FocusTarget, requireFocused: Bool, expected: String, offset: Int) {
         let el = target.element
-        // Do not move the selection after an unexplained text change or focus change.
-        guard case .success = Focus.validateStillFocused(target),
+        // Do not move the selection after an unexplained text change or invalid target.
+        guard case .success = validate(target, requireFocused: requireFocused),
               let actual = AX.string(el, kAXValueAttribute),
               AX.int(el, kAXNumberOfCharactersAttribute) == actual.utf16.count,
               offset >= 0, offset <= actual.utf16.count,
               StrictCompare.equal(actual, expected) || StrictCompare.removedTerminalLineEnding(actual: actual, expected: expected) != nil else {
-            AyreLog.log("caret restore: SKIPPED (cannot verify text, character count, and focus)")
+            AyreLog.log("caret restore: SKIPPED (cannot verify text, character count, and target validity)")
             return
         }
         let (check, settable) = AX.isSettable(el, kAXSelectedTextRangeAttribute)
@@ -146,9 +151,9 @@ public enum Inserter {
         guard error == .success else { return }
         let deadline = Date().addingTimeInterval(1)
         repeat {
-            guard case .success = Focus.validateStillFocused(target),
+            guard case .success = validate(target, requireFocused: requireFocused),
                   let current = AX.string(el, kAXValueAttribute), StrictCompare.equal(current, actual) else {
-                AyreLog.log("caret restore: UNVERIFIABLE (text or focus changed)")
+                AyreLog.log("caret restore: UNVERIFIABLE (text or target validity changed)")
                 return
             }
             if let readback = AX.range(el, kAXSelectedTextRangeAttribute),

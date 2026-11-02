@@ -95,6 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         AyreLog.echoToStderr = false
         AyreLog.section("App launched")
         AyreEnvironment.log()
+        FocusedFieldHistory.shared.start()
         if defaultLaunch == nil {
             recordDefaultLaunch(AppLifecycle.isDefaultLaunch(notification))
         }
@@ -340,6 +341,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     @objc private func refreshStatus() {
+        FocusedFieldHistory.shared.start()
         let trusted = AXIsProcessTrusted()
         statusLabel.stringValue = trusted
             ? "Accessibility permission is granted. Ayre can insert prompts into the focused field."

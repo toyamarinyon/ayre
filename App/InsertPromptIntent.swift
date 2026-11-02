@@ -64,7 +64,7 @@ struct InsertPromptIntent: AppIntent {
         }
         AyreLog.log("[perform] prompt=\(prompt.id) \(TextStats(text))")
         let target = try IntentTargetResolver.resolveAtPerform()
-        IntentTargetResolver.insertAfterSpotlightCloses(text: text, target: target)
+        try IntentTargetResolver.insertIntoTarget(text: text, target: target)
         return .result()
     }
 }
@@ -93,7 +93,7 @@ struct InsertLatestPromptIntent: AppIntent {
         }
         AyreLog.log("[perform] latest prompt=\(latest.slug) modified=\(latest.modified) \(TextStats(text))")
         let target = try IntentTargetResolver.resolveAtPerform()
-        IntentTargetResolver.insertAfterSpotlightCloses(text: text, target: target)
+        try IntentTargetResolver.insertIntoTarget(text: text, target: target)
         return .result()
     }
 }
@@ -101,11 +101,14 @@ struct InsertLatestPromptIntent: AppIntent {
 enum IntentTargetResolver {
     static let invokerBundleIDs: Set<String> = ["com.apple.Spotlight", "com.apple.shortcuts", "com.apple.siri"]
 
-    /// Uses only what AX reports at perform() time. If focus is on Spotlight (or anything we cannot
-    /// attribute to the original field), fail instead of guessing.
+    /// Prefer the field observed before Spotlight took focus. Cold starts retain direct capture.
     @MainActor
     static func resolveAtPerform() throws -> FocusTarget {
         guard AXIsProcessTrusted() else { throw IntentFailure(reason: AyreError.notTrusted.description) }
+        if let remembered = FocusedFieldHistory.shared.snapshot() {
+            AyreLog.log("[perform] frozen remembered target: \(remembered.summary)")
+            return remembered
+        }
         let front = NSWorkspace.shared.frontmostApplication
         AyreLog.log("[perform] NSWorkspace.frontmost=\(front?.bundleIdentifier ?? "?") pid=\(front?.processIdentifier ?? -1)")
 
@@ -165,48 +168,22 @@ enum IntentTargetResolver {
         }
     }
 
-    /// perform() returns first so Spotlight can close. Then we wait for the captured element itself to be focused again.
+    /// AX writes address the frozen element directly; foreground focus is irrelevant.
     @MainActor
-    static func insertAfterSpotlightCloses(text: String, target: FocusTarget) {
+    static func insertIntoTarget(text: String, target: FocusTarget) throws {
         IntentInsertionActivity.begin()
-        let start = Date()
-        func poll() {
-            let pid = try? Focus.systemWideFocusedApplicationPID().get()
-            let elapsed = Date().timeIntervalSince(start)
-            if pid == target.pid {
-                AyreLog.log("[deferred] focus returned to target app after \(String(format: "%.2f", elapsed))s")
-                switch Focus.validateStillFocused(target) {
-                case .failure(let e):
-                    AyreLog.log("[deferred] ABORT (nothing written): \(e)")
-                    NSSound.beep()
-                case .success:
-                    let method = InsertionStrategy.method(for: target)
-                    AyreLog.log("[deferred] insertion method=\(method.rawValue)")
-                    switch Inserter.insert(text, into: target, method: method) {
-                    case .failure(let e): AyreLog.log("[deferred] RESULT: failed \(e)"); NSSound.beep()
-                    case .success(let o): AyreLog.log("[deferred] RESULT: write=\(axErrorName(o.writeError)) verification=\(o.verification)")
-                    }
-                }
-                IntentInsertionActivity.end()
-                return
-            }
-            if elapsed > 5 {
-                let bid = pid.flatMap { Focus.appInfo(pid: $0).bundleID } ?? "?"
-                AyreLog.log("[deferred] ABORT: Focus did not return to the target app within 5 seconds (current pid=\(pid.map(String.init) ?? "?") \(bid))")
-                NSSound.beep()
-                IntentInsertionActivity.end()
-                return
-            }
-            schedule()
+        defer { IntentInsertionActivity.end() }
+        let method = InsertionStrategy.method(for: target)
+        AyreLog.log("[direct] target: \(target.summary) method=\(method.rawValue)")
+        switch Inserter.insert(text, into: target, method: method, requireFocused: false) {
+        case .failure(let error):
+            AyreLog.log("[direct] RESULT: failed \(error)")
+            throw IntentFailure(reason: error.description)
+        case .success(let outcome):
+            AyreLog.log("[direct] RESULT: write=\(axErrorName(outcome.writeError)) verification=\(outcome.verification)")
         }
-        func schedule() {
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 100_000_000)
-                poll()
-            }
-        }
-        schedule()
     }
+
 }
 
 struct AyreShortcuts: AppShortcutsProvider {

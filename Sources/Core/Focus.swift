@@ -280,6 +280,17 @@ public enum Focus {
         return .success(())
     }
 
+    /// Validate a remembered AX reference without consulting or changing foreground focus.
+    public static func validateTargetExists(_ target: FocusTarget) -> Result<Void, AyreError> {
+        guard AXIsProcessTrusted() else { return .failure(.notTrusted) }
+        guard AX.pid(target.element) == target.pid,
+              let running = NSRunningApplication(processIdentifier: target.pid), !running.isTerminated,
+              running.bundleIdentifier == target.bundleID else {
+            return .failure(.targetChanged("Remembered input field or its application no longer exists"))
+        }
+        return checkEditable(target)
+    }
+
     /// The target is still valid only if it still exists and is still the focused element of the focused app.
     public static func validateStillFocused(_ target: FocusTarget) -> Result<Void, AyreError> {
         switch systemWideFocusedApplicationPID() {
