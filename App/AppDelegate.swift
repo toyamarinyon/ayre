@@ -1,4 +1,5 @@
 import AppKit
+import AppIntents
 import ApplicationServices
 import CoreServices
 
@@ -92,6 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AyreShortcuts.updateAppShortcutParameters()
         AyreLog.echoToStderr = false
         AyreLog.section("App launched")
         AyreEnvironment.log()
