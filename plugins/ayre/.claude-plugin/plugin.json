@@ -1,7 +1,7 @@
 {
   "name": "ayre",
   "description": "Prepare and save self-contained Codex implementation handoffs with Ayre.",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "author": {
     "name": "Toyama Rinyon",
     "url": "https://github.com/toyamarinyon"
